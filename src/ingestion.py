@@ -15,3 +15,9 @@ def read_logs(path: Path) -> Iterator[SourceLine]:
             yield (str(path), number, line.rstrip("\n"))
 
 
+def read_multiple_logs(paths: Iterable[Path]) -> Iterator[SourceLine]:
+    """Lire chaque fichier successivement, dans l'ordre fourni."""
+    for path in paths:
+        yield from read_logs(path)
+
+
