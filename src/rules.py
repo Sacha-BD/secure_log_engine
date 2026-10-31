@@ -23,3 +23,41 @@ def make_alert(log: Log, rule: str, message: str) -> Alert:
     }
 
 
+def detect_bruteforce(log: Log, **config: Any) -> Alert | None:
+    """Détecter un bloc de X échecs consécutifs pour (IP, utilisateur).
+
+    Une fenêtre ne contient que X booléens au maximum. Les événements
+    réseau ne modifient pas les séries d'authentification. L'ordre utilisé
+    est celui des fichiers fournis, sans tri global en mémoire.
+    """
+    if log["event"] not in {"LOGIN_FAILED", "LOGIN_SUCCESS"}:
+        return None
+    threshold = config["threshold"]
+    histories: History = config["histories"]
+    identity = (log["ip"], log["user"])
+    if identity not in histories:
+        histories[identity] = deque(maxlen=threshold)
+    history = histories[identity]
+    history.append(log["event"] == "LOGIN_FAILED")
+
+    # Retirer les succès en tête de fenêtre, devenus inutiles.
+    while history and not history[0]:
+        history.popleft()
+
+    # Vérifier le cycle complet. Un succès intérieur interrompt le cycle.
+    for failed in history:
+        if failed:
+            continue
+        break
+    else:
+        # Exécuté seulement si aucun break : tous les essais sont en échec.
+        if len(history) == threshold:
+            del histories[identity]
+            return make_alert(
+                log, "BRUTE_FORCE", f"{threshold} échecs consécutifs"
+            )
+    if not history:
+        histories.pop(identity, None)
+    return None
+
+
