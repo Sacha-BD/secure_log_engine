@@ -68,3 +68,10 @@ def detect_blacklisted_ip(log: Log, **config: Any) -> Alert | None:
     return None
 
 
+def detect_critical_event(log: Log, **config: Any) -> Alert | None:
+    """Signaler chaque événement de gravité maximale."""
+    if log["level"] == "CRITICAL":
+        return make_alert(log, "CRITICAL", log["message"])
+    return None
+
+
