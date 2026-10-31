@@ -23,3 +23,10 @@ def describe_payload(payload: Any) -> str:
             raise ValueError("structure de payload non prise en charge")
 
 
+def normalize_log(log: Log) -> Log:
+    """Enrichir chaque dictionnaire sans conserver les logs précédents."""
+    result = log.copy()
+    result["message"] = describe_payload(log["payload"])
+    return result
+
+
