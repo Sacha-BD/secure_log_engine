@@ -21,3 +21,17 @@ def read_multiple_logs(paths: Iterable[Path]) -> Iterator[SourceLine]:
         yield from read_logs(path)
 
 
+def load_blacklist(path: Path) -> frozenset[str]:
+    """Charger uniquement les IP uniques, avec validation IPv4/IPv6."""
+    addresses: set[str] = set()
+    for source, number, line in read_logs(path):
+        value = line.split("#", 1)[0].strip()
+        if not value:
+            continue
+        try:
+            addresses.add(str(ip_address(value)))
+        except ValueError as error:
+            raise ValueError(
+                f"{source}:{number} : IP blacklist invalide : {value}"
+            ) from error
+    return frozenset(addresses)
