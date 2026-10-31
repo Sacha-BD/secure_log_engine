@@ -61,3 +61,10 @@ def detect_bruteforce(log: Log, **config: Any) -> Alert | None:
     return None
 
 
+def detect_blacklisted_ip(log: Log, **config: Any) -> Alert | None:
+    """Signaler chaque événement issu d'une adresse blacklistée."""
+    if log["ip"] in config["blacklist"]:
+        return make_alert(log, "BLACKLIST", "IP présente dans la blacklist")
+    return None
+
+
