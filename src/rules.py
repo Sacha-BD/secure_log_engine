@@ -75,3 +75,16 @@ def detect_critical_event(log: Log, **config: Any) -> Alert | None:
     return None
 
 
+def apply_security_rules(*args: Rule, **kwargs: Any) -> Iterator[Alert]:
+    """Recevoir N fonctions et leur transmettre une configuration nommée."""
+    log = kwargs.pop("log")
+    threshold = kwargs.get("threshold", 5)
+    if type(threshold) is not int or threshold < 1:
+        raise ValueError("le seuil doit être un entier strictement positif")
+    kwargs["threshold"] = threshold
+    for rule in args:
+        if not callable(rule):
+            raise TypeError("chaque règle doit être une fonction")
+        alert = rule(log, **kwargs)
+        if alert is not None:
+            yield alert
