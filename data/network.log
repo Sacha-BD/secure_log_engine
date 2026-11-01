@@ -1,0 +1,7 @@
+# Mélange de texte et d’objets JSON, postérieurs aux logs SSH.
+2026-09-29 08:00:20|info|192.0.2.10|alice|CONNECTION|["192.0.2.100",443,"tcp"]
+{"timestamp": "2026-09-29 08:00:21", "level": "warning", "ip": "192.0.2.30", "user": "service", "event": "ACCESS_DENIED", "payload": {"service": "dns", "code": 403}}
+{"timestamp": "2026-09-29 08:00:22", "level": "critical", "ip": "203.0.113.66", "user": "admin", "event": "MALFORMED_REQUEST", "payload": {"level": "ERROR", "code": 500}}
+2026-09-29 08:00:23|ERROR|192.0.2.30|service|TIMEOUT|Service distant indisponible
+2026-09-29 08:00:24|INFO|192.0.2.40|backup|CONNECTION|["192.0.2.100",53,"UDP"]
+2026-09-29 08:00:25|ERROR|192.0.2.30|service|ERROR|{"incomplet":
