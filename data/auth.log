@@ -1,0 +1,21 @@
+# Démonstration fictive : accès SSH à une salle informatique.
+
+2026-09-29 08:00:00|info|192.0.2.10|alice|LOGIN_SUCCESS|Session SSH ouverte
+2026-09-29 08:00:01|ERROR|203.0.113.66|admin|LOGIN_FAILED|Mot de passe incorrect
+2026-09-29 08:00:02|ERROR|203.0.113.66|admin|LOGIN_FAILED|Mot de passe incorrect
+2026-09-29 08:00:03|ERROR|203.0.113.66|admin|LOGIN_FAILED|Mot de passe incorrect
+2026-09-29 08:00:04|ERROR|203.0.113.66|admin|LOGIN_FAILED|Mot de passe incorrect
+2026-09-29 08:00:05|ERROR|203.0.113.66|admin|LOGIN_FAILED|Mot de passe incorrect
+2026-09-29 08:00:06|INFO|203.0.113.66|admin|LOGIN_SUCCESS|Connexion après plusieurs essais
+2026-09-29 08:00:07|WARNING|192.0.2.20|bob|LOGIN_FAILED|Mot de passe incorrect
+2026-09-29 08:00:08|WARNING|192.0.2.20|bob|LOGIN_FAILED|Mot de passe incorrect
+2026-09-29 08:00:09|INFO|192.0.2.20|bob|LOGIN_SUCCESS|Mot de passe corrigé
+2026-09-29 08:00:10|WARNING|192.0.2.20|bob|LOGIN_FAILED|Nouvel échec
+2026-09-29 08:00:11|WARNING|192.0.2.20|bob|LOGIN_FAILED|Nouvel échec
+2026-09-29 08:00:12|ERROR|198.51.100.24|root|LOGIN_FAILED|{"service":"ssh","code":401}
+2026-09-29 08:00:13|ERROR|198.51.100.24|root|LOGIN_FAILED|{"service":"ssh","code":401}
+2026-09-29 08:00:14|ERROR|198.51.100.24|root|LOGIN_FAILED|{"service":"ssh","code":401}
+2026-09-29 08:00:15|ERROR|198.51.100.24|root|LOGIN_FAILED|{"service":"ssh","code":401}
+2026-09-29 08:00:16|ERROR|198.51.100.24|root|LOGIN_FAILED|{"service":"ssh","code":401}
+ligne volontairement invalide
+2026-09-29 08:00:17|ERROR|999.2.3.4|guest|LOGIN_FAILED|IP invalide
