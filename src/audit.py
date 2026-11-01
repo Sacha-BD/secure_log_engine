@@ -21,3 +21,20 @@ def describe_scope(scope: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     return result
 
 
+def export_audit(
+    path: Path,
+    global_scope: Mapping[str, Any],
+    local_scope: Mapping[str, Any],
+) -> None:
+    """Recevoir les portées réelles du pipeline et inspecter ce module."""
+    report = {
+        "version": AUDIT_VERSION,
+        "pipeline_globals": describe_scope(global_scope),
+        "pipeline_locals": describe_scope(local_scope),
+        "audit_globals": describe_scope(globals()),
+        "audit_locals": describe_scope(locals()),
+    }
+    path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
