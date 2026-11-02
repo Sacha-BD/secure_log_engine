@@ -104,3 +104,53 @@ class IngestionTests(unittest.TestCase):
                 load_blacklist(path)
 
 
+class RuleTests(unittest.TestCase):
+    def evaluate(self, events, threshold=3):
+        histories = {}
+        alerts = []
+        for event in events:
+            alerts.extend(apply_security_rules(
+                detect_bruteforce, log=event, threshold=threshold,
+                histories=histories,
+            ))
+        return alerts, histories
+
+    def test_threshold_and_disjoint_blocks(self):
+        self.assertEqual(len(self.evaluate([sample()] * 2)[0]), 0)
+        self.assertEqual(len(self.evaluate([sample()] * 3)[0]), 1)
+        self.assertEqual(len(self.evaluate([sample()] * 7)[0]), 2)
+
+    def test_success_resets_series(self):
+        events = [sample()] * 2 + [sample("LOGIN_SUCCESS")] + [sample()] * 2
+        self.assertEqual(self.evaluate(events)[0], [])
+        self.assertEqual(len(self.evaluate(events + [sample()])[0]), 1)
+
+    def test_identities_are_independent(self):
+        events = [sample(), sample(ip="192.0.2.2"), sample(user="bob")]
+        self.assertEqual(self.evaluate(events * 2)[0], [])
+        self.assertEqual(len(self.evaluate(events * 3)[0]), 3)
+
+    def test_network_does_not_reset_authentication(self):
+        events = [sample(), sample("CONNECTION"), sample(), sample()]
+        self.assertEqual(len(self.evaluate(events)[0]), 1)
+
+    def test_threshold_one(self):
+        self.assertEqual(len(self.evaluate([sample()], 1)[0]), 1)
+        self.assertEqual(self.evaluate([sample("LOGIN_SUCCESS")], 1)[0], [])
+
+    def test_history_is_bounded(self):
+        _, histories = self.evaluate([sample()] * 10001, 5)
+        self.assertTrue(all(len(h) <= 5 for h in histories.values()))
+
+    def test_rule_functions_and_configuration(self):
+        def custom(log, **options):
+            return {"value": options["marker"], "user": log["user"]}
+        alerts = list(apply_security_rules(custom, log=sample(), marker=42))
+        self.assertEqual(alerts, [{"value": 42, "user": "alice"}])
+        self.assertEqual(list(apply_security_rules(log=sample())), [])
+        with self.assertRaises(ValueError):
+            list(apply_security_rules(log=sample(), threshold=0))
+        with self.assertRaises(TypeError):
+            list(apply_security_rules(42, log=sample()))
+
+
