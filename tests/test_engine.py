@@ -17,3 +17,9 @@ from src.processing import describe_payload, process_logs
 from src.rules import apply_security_rules, detect_bruteforce
 
 
+def sample(event="LOGIN_FAILED", ip="192.0.2.1", user="alice"):
+    return parse_log(
+        f"2026-09-29 10:00:00|error|{ip}|{user}|{event}|test"
+    )
+
+
