@@ -154,3 +154,97 @@ class RuleTests(unittest.TestCase):
             list(apply_security_rules(42, log=sample()))
 
 
+class IntegrationTests(unittest.TestCase):
+    def test_aggregation_and_sets(self):
+        analyzer = Analyzer()
+        analyzer.update(sample())
+        analyzer.update(sample(ip="192.0.2.2"))
+        result = analyzer.summary(frozenset({"192.0.2.2", "192.0.2.3"}))
+        self.assertEqual(result["by_level"], {"ERROR": 2})
+        self.assertEqual(result["sets"]["intersection"], ["192.0.2.2"])
+        self.assertEqual(result["sets"]["difference"], ["192.0.2.1"])
+        self.assertEqual(len(result["sets"]["union"]), 3)
+        self.assertEqual(
+            result["sets"]["symmetric_difference"], ["192.0.2.1", "192.0.2.3"]
+        )
+
+    def test_demo_and_exported_alerts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            with self.assertLogs(level="WARNING"):
+                result = run(
+                    [BASE_DIR / "data/auth.log",
+                     BASE_DIR / "data/network.log"],
+                    BASE_DIR / "data/blacklist.txt", out,
+                )
+            self.assertEqual(result["total"], 22)
+            self.assertEqual(result["input"]["invalid"], 3)
+            self.assertEqual(result["alerts"], {
+                "BRUTE_FORCE": 2, "BLACKLIST": 12, "CRITICAL": 1,
+            })
+            alerts = [json.loads(line) for line in
+                      (out / "alerts.jsonl").read_text().splitlines()]
+            self.assertEqual(len(alerts), 15)
+            saved = json.loads((out / "summary.json").read_text())
+            self.assertEqual(saved, result)
+            audit = json.loads((out / "audit.json").read_text())
+            self.assertEqual(
+                audit["pipeline_locals"]["histories"]["type"], "dict"
+            )
+
+    def test_empty_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "empty.log"
+            path.touch()
+            summary = run([path], BASE_DIR / "data/blacklist.txt", path.parent)
+            self.assertEqual(summary["total"], 0)
+            self.assertEqual(summary["alerts"], {})
+
+    def test_audit_does_not_export_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "audit.json"
+            export_audit(path, {"password": "SECRET"}, {"count": 123})
+            text = path.read_text()
+            self.assertNotIn("SECRET", text)
+            self.assertIn("password", text)
+
+    def test_cannot_overwrite_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "alerts.jsonl"
+            path.write_text("original")
+            with self.assertRaises(ValueError):
+                run([path], BASE_DIR / "data/blacklist.txt", path.parent)
+            self.assertEqual(path.read_text(), "original")
+
+    def test_strict_failure_preserves_previous_results(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            old = out / "alerts.jsonl"
+            old.write_text("ancien résultat")
+            with self.assertRaises(ValueError):
+                run([BASE_DIR / "data/auth.log"],
+                    BASE_DIR / "data/blacklist.txt", out, strict=True)
+            self.assertEqual(old.read_text(), "ancien résultat")
+            self.assertEqual(list(out.iterdir()), [old])
+
+    def test_cli_errors(self):
+        for arguments, expected in [
+            (["--threshold", "0"], 2), (["fichier_absent.log"], 1),
+            (["--strict"], 1),
+        ]:
+            with self.subTest(arguments=arguments):
+                self.check_cli_error(arguments, expected)
+
+    def check_cli_error(self, arguments, expected):
+        with tempfile.TemporaryDirectory() as d:
+            result = subprocess.run(
+                [sys.executable, str(BASE_DIR / "main.py"),
+                 "--output", d, *arguments],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, expected)
+            self.assertNotIn("Traceback", result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
