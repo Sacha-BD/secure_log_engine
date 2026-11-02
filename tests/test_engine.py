@@ -81,3 +81,26 @@ class ParsingTests(unittest.TestCase):
             list(process_logs([("test", 42, "bad")], counters, True))
 
 
+class IngestionTests(unittest.TestCase):
+    def test_files_are_opened_on_demand(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "log"
+            stream = read_logs(path)
+            path.write_text("premier\ndeuxième\n", encoding="utf-8")
+            with self.assertRaises(FileNotFoundError):
+                combined = read_multiple_logs([path, path.parent / "absent"])
+                self.assertEqual(next(combined)[2], "premier")
+                self.assertEqual(next(combined)[2], "deuxième")
+                next(combined)
+            self.assertEqual(list(stream)[1][1], 2)
+
+    def test_blacklist_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "blacklist"
+            path.write_text("192.0.2.1\n192.0.2.1 # doublon\n")
+            self.assertEqual(load_blacklist(path), frozenset({"192.0.2.1"}))
+            path.write_text("IP invalide\n")
+            with self.assertRaises(ValueError):
+                load_blacklist(path)
+
+
