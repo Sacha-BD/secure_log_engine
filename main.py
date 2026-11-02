@@ -26,3 +26,13 @@ from src.rules import (
 BASE_DIR = Path(__file__).resolve().parent
 
 
+def positive_int(text: str) -> int:
+    """Valider le seuil avant d'ouvrir les sorties."""
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(
+            "valeur strictement positive attendue"
+        )
+    return value
+
+
