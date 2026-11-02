@@ -97,3 +97,54 @@ def run(
     return summary
 
 
+def main() -> int:
+    """Lire les options et afficher un résumé compréhensible."""
+    parser = argparse.ArgumentParser(
+        description="Analyse progressive de logs système et réseau."
+    )
+    parser.add_argument(
+        "files", nargs="*", type=Path,
+        help="fichiers lus dans cet ordre (défaut : données de démonstration)",
+    )
+    parser.add_argument(
+        "--blacklist", type=Path, default=BASE_DIR / "data/blacklist.txt",
+        help="fichier contenant une IP par ligne",
+    )
+    parser.add_argument(
+        "--output", type=Path, default=BASE_DIR / "results",
+        help="dossier des résultats (défaut : results/)",
+    )
+    parser.add_argument(
+        "--threshold", type=positive_int, default=5,
+        help="nombre d'échecs consécutifs déclenchant une alerte (défaut : 5)",
+    )
+    parser.add_argument(
+        "--strict", action="store_true",
+        help="arrêter l'analyse dès la première ligne invalide",
+    )
+    options = parser.parse_args()
+    paths = options.files or [
+        BASE_DIR / "data/auth.log", BASE_DIR / "data/network.log"
+    ]
+    logging.basicConfig(
+        level=logging.WARNING, format="%(levelname)s : %(message)s"
+    )
+    try:
+        summary = run(
+            paths, options.blacklist, options.output,
+            options.threshold, options.strict,
+        )
+    except (OSError, ValueError, UnicodeError) as error:
+        print(f"Erreur : {error}", file=sys.stderr)
+        return 1
+    print("SECURELOG ENGINE")
+    print(f"Logs analysés : {summary['total']}")
+    print(f"Lignes rejetées : {summary['input']['invalid']}")
+    print(f"Par niveau : {summary['by_level']}")
+    print(f"Alertes : {summary['alerts']}")
+    print(f"Résultats : {options.output.resolve()}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
