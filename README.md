@@ -180,3 +180,21 @@ avec les trois autres fonctions. `*args` reçoit les fonctions elles-mêmes ;
 `**kwargs` transmet notamment `threshold`, `histories` et `blacklist`.
 L'état `histories` appartient à une seule analyse et son seuil reste fixe.
 
+## Correspondance avec l'énoncé
+
+| Exigence | Mise en œuvre |
+|---|---|
+| Python 3.10+, environnement, dépendances | garde de version, `.venv`, `requirements.txt` |
+| Package et démonstration | `src/__init__.py` et `main.py` |
+| `yield`, `yield from` | `read_logs`, `read_multiple_logs` |
+| Dictionnaires, types variés, tuples | `Log`, `parse_log`, `connection`, `source` |
+| `filter`, `lambda`, `map` | `process_logs` |
+| `match-case` texte/dict/tuple | `describe_payload` |
+| `set`, `frozenset`, `\|`, `&`, `-`, `^` | `Analyzer.summary`, `load_blacklist` |
+| `defaultdict` | compteurs par niveau, utilisateur et règle |
+| `for`, `while`, `break`, `continue`, `else` | `detect_bruteforce` |
+| `*args`, `**kwargs`, fonctions objets | `apply_security_rules` |
+| `globals()`, `locals()` | `run`, `export_audit` |
+| Typage, exceptions, PEP8 | annotations, erreurs contrôlées, tests et contrôle de style |
+| Dépôt et rapport | dépôt Git local, `report/rapport.ipynb` exécuté |
+
