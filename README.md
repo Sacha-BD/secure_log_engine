@@ -163,3 +163,20 @@ sont lus successivement, sans tri chronologique global. Une ligne rejetée est
 ignorée ; un succès contenu dans une ligne invalide ne peut donc pas réinitialiser
 la détection. Ce choix et les alertes nécessitent une interprétation humaine.
 
+## Ajouter une règle
+
+Une règle reçoit un `Log` et les options nommées ; elle retourne un dictionnaire
+d'alerte ou `None`. Exemple à placer dans `src/rules.py` :
+
+```python
+def detect_admin(log: Log, **config: Any) -> Alert | None:
+    if log["user"] == "admin" and log["event"] == "LOGIN_SUCCESS":
+        return make_alert(log, "ADMIN_LOGIN", "Connexion administrateur")
+    return None
+```
+
+Importer cette fonction dans `main.py` et la passer à `apply_security_rules`
+avec les trois autres fonctions. `*args` reçoit les fonctions elles-mêmes ;
+`**kwargs` transmet notamment `threshold`, `histories` et `blacklist`.
+L'état `histories` appartient à une seule analyse et son seuil reste fixe.
+
