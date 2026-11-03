@@ -118,3 +118,30 @@ Le remplacement des trois fichiers n'est pas une transaction : une panne au
 moment des remplacements peut laisser un mélange de deux exécutions.
 Ne pas lancer deux analyses simultanées vers le même dossier de résultats.
 
+## Format des logs
+
+Les fichiers sont encodés en UTF-8. Deux représentations sont acceptées :
+
+```text
+2026-09-29 08:00:00|INFO|192.0.2.10|alice|LOGIN_SUCCESS|Session ouverte
+2026-09-29 08:00:01|INFO|192.0.2.10|alice|CONNECTION|["192.0.2.100",443,"TCP"]
+```
+
+```json
+{"timestamp":"2026-09-29 08:00:02","level":"ERROR","ip":"192.0.2.30","user":"service","event":"TIMEOUT","payload":{"level":"ERROR","code":504}}
+```
+
+Le format texte comporte six champs : date, niveau, IP source, utilisateur,
+événement, payload. La séparation est limitée aux cinq premiers `|` pour que
+le message puisse en contenir. Le payload accepte une chaîne, un objet JSON
+ou une liste `[IP destination, port, protocole]`, convertie en tuple immuable.
+Une chaîne commençant par `{` ou `[` est interprétée comme du JSON.
+Les dates ISO locales sans fuseau sont converties en `datetime`. Les IP sont
+validées et normalisées (IPv4 ou IPv6), les ports vont de 1 à 65535 et les
+protocoles autorisés sont TCP et UDP. L'utilisateur reste sensible à la casse ;
+le niveau, le protocole et l'événement passent en majuscules.
+
+`match-case` route le payload normalisé : texte brut, dictionnaire d'erreur
+ou générique, tuple de connexion. Le dictionnaire principal conserve également
+la provenance fixe `(fichier, numéro de ligne)` et un message lisible.
+
