@@ -38,3 +38,33 @@ regénérer ce fichier avec `python -m pip freeze > requirements.txt`.
 Un éditeur de notebooks et son noyau sont des outils de lecture/exécution
 optionnels ; les résultats enregistrés sont consultables sans installer Jupyter.
 
+## Fichiers à comprendre
+
+```text
+secure_log_engine/
+├── main.py                 point d'entrée et enchaînement des étapes
+├── requirements.txt        dépendances exportées par pip freeze
+├── README.md               installation, démonstration et choix techniques
+├── .gitignore              exclut environnement, caches et résultats
+├── data/
+│   ├── auth.log            connexions SSH réussies et échouées
+│   ├── network.log         connexions réseau et erreurs applicatives
+│   └── blacklist.txt       IP de test à surveiller
+├── src/
+│   ├── __init__.py         fait de src un package Python
+│   ├── ingestion.py        yield, yield from et lecture de la blacklist
+│   ├── parser.py           validation et dictionnaire Log typé
+│   ├── processing.py       filter, lambda, map et match-case
+│   ├── analyzer.py         compteurs et opérations sur les ensembles
+│   ├── rules.py            trois règles et moteur extensible
+│   └── audit.py            noms, types et tailles des variables en mémoire
+├── tests/
+│   └── test_engine.py      tests des comportements et du pipeline complet
+└── report/
+    └── rapport.ipynb       rapport synthétique avec résultats exécutés
+```
+
+`results/` est créé à l'exécution et ignoré par Git.
+L'ordre de lecture conseillé est `main.py`, puis `ingestion.py`, `parser.py`,
+`processing.py`, `analyzer.py`, `rules.py` et `audit.py`.
+
