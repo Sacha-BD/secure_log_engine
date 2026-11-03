@@ -145,3 +145,21 @@ le niveau, le protocole et l'événement passent en majuscules.
 ou générique, tuple de connexion. Le dictionnaire principal conserve également
 la provenance fixe `(fichier, numéro de ligne)` et un message lisible.
 
+## Détection de brute force
+
+Une identité est un tuple `(IP source, utilisateur)`. Pour chaque identité,
+un `deque(maxlen=threshold)` conserve les derniers résultats d'authentification
+sous forme de booléens. Les événements réseau sont ignorés par cette règle.
+La boucle `while` enlève les succès en tête ; la boucle `for` vérifie les essais.
+`continue` passe au prochain échec ; `break` interrompt la validation sur un
+succès intérieur ; `for...else` confirme que la fenêtre ne contient que des
+échecs. Si elle atteint le seuil, une alerte est émise et la fenêtre supprimée.
+
+On obtient une alerte par **bloc disjoint** de X échecs : douze échecs au seuil 5
+donnent deux alertes et deux essais restants. Un succès empêche d'additionner les
+échecs qui le précèdent avec ceux qui le suivent. Il n'y a pas de fenêtre de temps :
+les événements sont considérés dans l'ordre de lecture fourni. Les fichiers
+sont lus successivement, sans tri chronologique global. Une ligne rejetée est
+ignorée ; un succès contenu dans une ligne invalide ne peut donc pas réinitialiser
+la détection. Ce choix et les alertes nécessitent une interprétation humaine.
+
