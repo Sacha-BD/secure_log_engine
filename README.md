@@ -198,3 +198,19 @@ L'état `histories` appartient à une seule analyse et son seuil reste fixe.
 | Typage, exceptions, PEP8 | annotations, erreurs contrôlées, tests et contrôle de style |
 | Dépôt et rapport | dépôt Git local, `report/rapport.ipynb` exécuté |
 
+## Mémoire et limites
+
+La lecture, le parsing, le filtrage et les transformations sont paresseux.
+Les alertes sont écrites au fil de l'eau. La mémoire dépend de la taille d'une
+ligne, du nombre d'IP/utilisateurs distincts, de la blacklist et des fenêtres
+d'authentification, **pas de la totalité des lignes**. Avec U IP, V utilisateurs,
+P couples actifs et un seuil X, l'état principal est de l'ordre de
+`O(U + V + P × X + taille_blacklist)`. Les ensembles exacts ne peuvent pas rester
+constants si chaque nouvelle ligne introduit une nouvelle IP. Une ligne unique
+immense peut elle aussi consommer beaucoup de mémoire.
+
+Le programme analyse un flux fini et émet les alertes progressivement ; il ne
+surveille pas en continu un fichier en cours d'écriture (`tail -f`). Il n'effectue
+aucun blocage réseau et n'est pas un SIEM de production. Ces limites gardent le
+projet lisible pour un débutant et sont distinctes des notions évaluées.
+
