@@ -68,3 +68,53 @@ secure_log_engine/
 L'ordre de lecture conseillé est `main.py`, puis `ingestion.py`, `parser.py`,
 `processing.py`, `analyzer.py`, `rules.py` et `audit.py`.
 
+## Démonstration et options
+
+```bash
+python main.py
+python main.py --threshold 3 --output results/seuil3
+python main.py data/auth.log data/network.log --blacklist data/blacklist.txt
+python main.py --help
+python main.py --strict --output results/strict
+```
+
+La dernière commande s'arrête volontairement : le jeu de test comprend trois
+lignes invalides. Le mode normal les signale sur la sortie d'erreur et continue.
+Le mode strict retourne le code 1 ; les arguments invalides retournent 2.
+Une exécution réussie retourne 0. Un fichier absent, un encodage autre que UTF-8
+ou une blacklist invalide arrête également l'analyse.
+Les chemins fournis sont relatifs au terminal ; les chemins par défaut sont
+relatifs au projet. Le programme fonctionne donc aussi depuis un autre dossier.
+
+Résultats attendus avec le seuil par défaut de 5 :
+
+| Mesure | Résultat |
+|---|---:|
+| Lignes lues, commentaires compris | 28 |
+| Lignes vides ou commentaires ignorés | 3 |
+| Logs valides analysés | 22 |
+| Lignes invalides rejetées | 3 |
+| INFO / WARNING / ERROR / CRITICAL | 5 / 5 / 11 / 1 |
+| Alertes BRUTE_FORCE | 2 |
+| Alertes BLACKLIST | 12 |
+| Alertes CRITICAL | 1 |
+
+Une même ligne peut déclencher plusieurs règles. Une alerte BLACKLIST est
+émise **par événement**, et non par IP unique.
+Les adresses `203.0.113.66` (admin) et `198.51.100.24` (root) produisent chacune
+un bloc de cinq échecs. Les essais de bob sont séparés par un succès : ils ne
+produisent aucune alerte de brute force au seuil de 5.
+
+### Fichiers produits
+
+- `summary.json` : compteurs, IP uniques et quatre opérations d'ensembles.
+- `alerts.jsonl` : une alerte JSON par ligne, écrite dès sa détection.
+- `audit.json` : noms, types et tailles des variables des portées du pipeline
+  et du module d'audit, sans recopier leurs valeurs.
+
+Les sorties sont préparées dans un dossier temporaire, puis remplacées après
+une analyse réussie. Une erreur de parsing conserve les anciens résultats.
+Le remplacement des trois fichiers n'est pas une transaction : une panne au
+moment des remplacements peut laisser un mélange de deux exécutions.
+Ne pas lancer deux analyses simultanées vers le même dossier de résultats.
+
