@@ -214,3 +214,22 @@ surveille pas en continu un fichier en cours d'écriture (`tail -f`). Il n'effec
 aucun blocage réseau et n'est pas un SIEM de production. Ces limites gardent le
 projet lisible pour un débutant et sont distinctes des notions évaluées.
 
+## Validation et présentation orale
+
+22 tests couvrent le parsing, les erreurs, la lecture à la demande, les ensembles,
+les règles, les seuils, les identités séparées, l'audit et les exports complets.
+Exécution vérifiée sur Python 3.14.7 ; syntaxe vérifiée pour Python 3.10.
+Le contrôle PEP8 est réalisé avec un outil de qualité dans un environnement
+séparé, sans ajouter de dépendance au programme livré.
+
+Pour une démonstration en cinq minutes :
+
+1. Lancer `python main.py` et ouvrir `results/summary.json`.
+2. Expliquer une ligne de `data/auth.log` et son dictionnaire après parsing.
+3. Montrer que `yield` livre une seule ligne puis suspend la fonction.
+4. Montrer les deux alertes BRUTE_FORCE dans `results/alerts.jsonl`.
+5. Expliquer le rôle du succès de bob et du `for...else`.
+6. Présenter le tableau de conformité et les résultats du Notebook.
+
+Le rapport reprend les choix et les limites. Les membres du trinôme peuvent
+ajouter leurs noms et reformuler leurs explications après avoir étudié le code.
