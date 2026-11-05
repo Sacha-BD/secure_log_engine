@@ -7,13 +7,11 @@ import sys
 import tempfile
 from collections import defaultdict
 from pathlib import Path
-
-if sys.version_info < (3, 10):
-    raise SystemExit("Python 3.10 ou une version plus récente est nécessaire.")
+from typing import Any, TextIO
 
 from src.analyzer import Analyzer
 from src.audit import export_audit
-from src.ingestion import load_blacklist, read_multiple_logs
+from src.ingestion import STDIN_PATH, load_blacklist, read_multiple_logs
 from src.processing import process_logs
 from src.rules import (
     History,
@@ -42,14 +40,21 @@ def run(
     output_dir: Path,
     threshold: int = 5,
     strict: bool = False,
-) -> dict:
+    *,
+    stdin: TextIO | None = None,
+    alert_output: TextIO | None = None,
+) -> dict[str, Any]:
     """Lancer toutes les étapes de l'analyse."""
     if type(threshold) is not int or threshold < 1:
         raise ValueError("le seuil doit être un entier strictement positif")
     if not paths:
         raise ValueError("au moins un fichier de logs est nécessaire")
-    # On vérifie les fichiers avant de commencer l'analyse.
-    inputs = [*paths, blacklist_path]
+    file_paths = paths
+    if stdin is not None:
+        if paths.count(STDIN_PATH) > 1:
+            raise ValueError("l'entrée standard ne peut être lue qu'une fois")
+        file_paths = [path for path in paths if path != STDIN_PATH]
+    inputs = [*file_paths, blacklist_path]
     for path in inputs:
         if not path.is_file():
             raise FileNotFoundError(f"fichier introuvable : {path}")
@@ -58,13 +63,17 @@ def run(
     )]
     if {p.resolve() for p in inputs} & {p.resolve() for p in targets}:
         raise ValueError("un fichier de sortie ne peut pas être une entrée")
+    for target in targets:
+        if target.is_dir():
+            raise IsADirectoryError(f"la sortie est un dossier : {target}")
     blacklist = load_blacklist(blacklist_path)
     output_dir.mkdir(parents=True, exist_ok=True)
     counters = dict(read=0, ignored=0, invalid=0, valid=0)
     analyzer = Analyzer()
     histories: History = {}
     alerts_by_rule: defaultdict[str, int] = defaultdict(int)
-    logs = process_logs(read_multiple_logs(paths), counters, strict)
+    sources = read_multiple_logs(paths, stdin=stdin)
+    logs = process_logs(sources, counters, strict)
     # Les nouveaux résultats sont d'abord écrits dans un dossier temporaire.
     with tempfile.TemporaryDirectory(dir=output_dir) as temporary:
         staging = Path(temporary)
@@ -82,7 +91,11 @@ def run(
                     blacklist=blacklist,
                 ):
                     alerts_by_rule[alert["rule"]] += 1
-                    stream.write(json.dumps(alert, ensure_ascii=False) + "\n")
+                    line = json.dumps(alert, ensure_ascii=False) + "\n"
+                    stream.write(line)
+                    if alert_output is not None:
+                        alert_output.write(line)
+                        alert_output.flush()
         summary = analyzer.summary(blacklist)
         summary["input"] = counters
         summary["alerts"] = dict(sorted(alerts_by_rule.items()))
@@ -104,7 +117,7 @@ def main() -> int:
     )
     parser.add_argument(
         "files", nargs="*", type=Path,
-        help="fichiers lus dans cet ordre (défaut : données de démonstration)",
+        help="fichiers dans l'ordre, ou - pour lire l'entrée standard",
     )
     parser.add_argument(
         "--blacklist", type=Path, default=BASE_DIR / "data/blacklist.txt",
@@ -116,11 +129,15 @@ def main() -> int:
     )
     parser.add_argument(
         "--threshold", type=positive_int, default=5,
-        help="nombre d'échecs consécutifs déclenchant une alerte (défaut : 5)",
+        help="seuil d'échecs de connexion consécutifs (défaut : 5)",
     )
     parser.add_argument(
         "--strict", action="store_true",
         help="arrêter l'analyse dès la première ligne invalide",
+    )
+    parser.add_argument(
+        "--stream-alerts", action="store_true",
+        help="émettre les alertes JSONL sur la sortie standard dès détection",
     )
     options = parser.parse_args()
     paths = options.files or [
@@ -130,19 +147,27 @@ def main() -> int:
         level=logging.WARNING, format="%(levelname)s : %(message)s"
     )
     try:
+        stdin = None
+        if STDIN_PATH in paths:
+            sys.stdin.reconfigure(encoding="utf-8", errors="surrogateescape")
+            stdin = sys.stdin
+        if options.stream_alerts:
+            sys.stdout.reconfigure(encoding="utf-8")
         summary = run(
             paths, options.blacklist, options.output,
-            options.threshold, options.strict,
+            options.threshold, options.strict, stdin=stdin,
+            alert_output=sys.stdout if options.stream_alerts else None,
         )
-    except (OSError, ValueError, UnicodeError) as error:
+    except (OSError, ValueError) as error:
         print(f"Erreur : {error}", file=sys.stderr)
         return 1
-    print("SECURELOG ENGINE")
-    print(f"Logs analysés : {summary['total']}")
-    print(f"Lignes rejetées : {summary['input']['invalid']}")
-    print(f"Par niveau : {summary['by_level']}")
-    print(f"Alertes : {summary['alerts']}")
-    print(f"Résultats : {options.output.resolve()}")
+    console = sys.stderr if options.stream_alerts else sys.stdout
+    print("SECURELOG ENGINE", file=console)
+    print(f"Logs analysés : {summary['total']}", file=console)
+    print(f"Lignes rejetées : {summary['input']['invalid']}", file=console)
+    print(f"Par niveau : {summary['by_level']}", file=console)
+    print(f"Alertes : {summary['alerts']}", file=console)
+    print(f"Résultats : {options.output.resolve()}", file=console)
     return 0
 
 

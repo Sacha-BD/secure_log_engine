@@ -30,24 +30,23 @@ def detect_bruteforce(log: Log, **config: Any) -> Alert | None:
     threshold = config["threshold"]
     histories: History = config["histories"]
     identity = (log["ip"], log["user"])
+    failed = log["event"] == "LOGIN_FAILED"
     if identity not in histories:
-        histories[identity] = deque(maxlen=threshold)
+        if not failed:
+            return None
+        histories[identity] = deque()
     history = histories[identity]
-    history.append(log["event"] == "LOGIN_FAILED")
+    history.append(failed)
 
-    # Une réussite remet la série d'échecs à zéro.
-    while history and not history[0]:
-        history.popleft()
-
-    # La boucle doit aller jusqu'au bout pour confirmer la série d'échecs.
-    for failed in history:
-        if failed:
-            continue
-        break
-    else:
-        # Ce else est exécuté seulement si aucun break n'a été rencontré.
-        if len(history) == threshold:
-            del histories[identity]
+    # Chaque tentative examinée est retirée. Un succès annule le préfixe.
+    while len(history) >= threshold:
+        for _ in range(threshold):
+            if history.popleft():
+                continue
+            break
+        else:
+            if not history:
+                del histories[identity]
             return make_alert(
                 log, "BRUTE_FORCE", f"{threshold} échecs consécutifs"
             )

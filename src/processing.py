@@ -27,6 +27,9 @@ def normalize_log(log: Log) -> Log:
     """Ajouter un message lisible au dictionnaire du log."""
     result = log.copy()
     result["message"] = describe_payload(log["payload"])
+    # Les échappements JSON peuvent introduire des caractères non UTF-8.
+    for value in (result["user"], result["ip"], result["message"]):
+        value.encode("utf-8")
     return result
 
 
@@ -36,6 +39,7 @@ def process_logs(
     strict: bool = False,
 ) -> Iterator[Log]:
     """Traiter les lignes valides et compter les lignes refusées."""
+
     def counted_lines() -> Iterator[SourceLine]:
         for line in lines:
             counters["read"] += 1
@@ -43,11 +47,12 @@ def process_logs(
                 counters["ignored"] += 1
             yield line
 
-    def safe_parse(line: SourceLine) -> Log | None:
+    def parse_and_normalize(line: SourceLine) -> Log | None:
         source, number, text = line
         try:
-            parsed = parse_log(text, (source, number))
-        except (ValueError, TypeError, RecursionError) as error:
+            text.encode("utf-8")  # Détecter les octets invalides de la source.
+            normalized = normalize_log(parse_log(text, (source, number)))
+        except (ValueError, RecursionError) as error:
             counters["invalid"] += 1
             if strict:
                 raise ValueError(f"{source}:{number} : {error}") from error
@@ -56,13 +61,11 @@ def process_logs(
             )
             return None
         counters["valid"] += 1
-        return parsed
+        return normalized
 
     nonempty = filter(
         lambda line: bool(line[2].strip())
         and not line[2].lstrip().startswith("#"),
         counted_lines(),
     )
-    parsed = map(safe_parse, nonempty)
-    valid = filter(lambda log: log is not None, parsed)
-    return map(normalize_log, valid)
+    return filter(None, map(parse_and_normalize, nonempty))

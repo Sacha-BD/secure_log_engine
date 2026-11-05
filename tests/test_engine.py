@@ -80,6 +80,20 @@ class ParsingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "test:42"):
             list(process_logs([("test", 42, "bad")], counters, True))
 
+    def test_normalization_error_uses_rejection_policy(self):
+        prefix = "2026-09-29 10:00:00|CRITICAL|192.0.2.1|alice|TEST|"
+        lines = [
+            ("test", 1, prefix + r'{"level":"ERROR","code":"\ud800"}'),
+            ("test", 2, prefix + "message valide"),
+        ]
+        counters = dict(read=0, ignored=0, invalid=0, valid=0)
+        with self.assertLogs(level="WARNING"):
+            logs = list(process_logs(lines, counters))
+        self.assertEqual([log["message"] for log in logs], ["message valide"])
+        self.assertEqual(counters, dict(read=2, ignored=0, invalid=1, valid=1))
+        with self.assertRaisesRegex(ValueError, "test:1"):
+            list(process_logs(lines, counters, strict=True))
+
 
 class IngestionTests(unittest.TestCase):
     def test_files_are_opened_on_demand(self):
@@ -101,6 +115,9 @@ class IngestionTests(unittest.TestCase):
             self.assertEqual(load_blacklist(path), frozenset({"192.0.2.1"}))
             path.write_text("IP invalide\n")
             with self.assertRaises(ValueError):
+                load_blacklist(path)
+            path.write_bytes(b"fe80::1%bad\xff\n")
+            with self.assertRaisesRegex(ValueError, "blacklist:1"):
                 load_blacklist(path)
 
 
@@ -140,7 +157,12 @@ class RuleTests(unittest.TestCase):
 
     def test_history_is_bounded(self):
         _, histories = self.evaluate([sample()] * 10001, 5)
-        self.assertTrue(all(len(h) <= 5 for h in histories.values()))
+        self.assertEqual(len(histories[("192.0.2.1", "alice")]), 1)
+
+    def test_large_threshold_does_not_allocate_a_full_history(self):
+        alerts, histories = self.evaluate([sample()] * 3, sys.maxsize + 1)
+        self.assertEqual(alerts, [])
+        self.assertEqual(len(histories[("192.0.2.1", "alice")]), 3)
 
     def test_rule_functions_and_configuration(self):
         def custom(log, **options):
@@ -200,6 +222,43 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(summary["total"], 0)
             self.assertEqual(summary["alerts"], {})
 
+    def test_invalid_utf8_does_not_discard_following_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "input.log"
+            path.write_bytes(
+                b"bad byte: \xff\n"
+                b"2026-09-29 10:00:00|INFO|192.0.2.1|alice|TEST|ok\n"
+            )
+            blacklist = BASE_DIR / "data/blacklist.txt"
+            with self.assertLogs(level="WARNING") as warnings:
+                result = run([path], blacklist, path.parent)
+            self.assertIn("input.log:1", warnings.output[0])
+            self.assertEqual(result["input"], {
+                "read": 2, "ignored": 0, "invalid": 1, "valid": 1,
+            })
+            with self.assertRaisesRegex(ValueError, "input.log:1"):
+                run([path], blacklist, path.parent, strict=True)
+
+    def test_cli_combines_stdin_and_files_in_order(self):
+        line = "2026-09-29 10:00:00|ERROR|192.0.2.1|alice|LOGIN_FAILED|échec"
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            path = out / "input.log"
+            path.write_text(line + "\n", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(BASE_DIR / "main.py"),
+                 "--output", directory, "--threshold", "2", "--stream-alerts",
+                 str(path), "-"],
+                input=(line + "\n").encode("utf-8"),
+                capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            alert = json.loads((out / "alerts.jsonl").read_text())
+            self.assertEqual(json.loads(result.stdout), alert)
+            self.assertIn(b"SECURELOG ENGINE", result.stderr)
+            self.assertEqual(alert["rule"], "BRUTE_FORCE")
+            self.assertEqual(alert["source"], ["<stdin>", 1])
+
     def test_audit_does_not_export_values(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "audit.json"
@@ -227,10 +286,21 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(old.read_text(), "ancien résultat")
             self.assertEqual(list(out.iterdir()), [old])
 
+    def test_directory_at_output_path_preserves_previous_results(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            summary = out / "summary.json"
+            summary.write_text("ancien résultat")
+            (out / "alerts.jsonl").mkdir()
+            with self.assertRaises(IsADirectoryError):
+                run([BASE_DIR / "data/auth.log"],
+                    BASE_DIR / "data/blacklist.txt", out)
+            self.assertEqual(summary.read_text(), "ancien résultat")
+
     def test_cli_errors(self):
         for arguments, expected in [
             (["--threshold", "0"], 2), (["fichier_absent.log"], 1),
-            (["--strict"], 1),
+            (["--strict"], 1), (["-", "-"], 1),
         ]:
             with self.subTest(arguments=arguments):
                 self.check_cli_error(arguments, expected)
