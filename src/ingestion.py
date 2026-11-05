@@ -45,6 +45,6 @@ def load_blacklist(path: Path) -> frozenset[str]:
             addresses.add(str(ip_address(value)))
         except ValueError as error:
             raise ValueError(
-                f"{source}:{number} : IP blacklist invalide : {value}"
+                f"{source}:{number} : IP blacklist invalide : {value!r}"
             ) from error
     return frozenset(addresses)

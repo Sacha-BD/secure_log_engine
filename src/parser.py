@@ -36,9 +36,9 @@ def parse_log(text: str, source: tuple[str, int] = ("<texte>", 1)) -> Log:
             ("timestamp", "level", "ip", "user", "event", "payload"),
             parts,
         ))
-        payload = parts[5].strip()
-        if payload.startswith(("{", "[")):
-            record["payload"] = json.loads(payload)
+        payload_text = parts[5].strip()
+        if payload_text.startswith(("{", "[")):
+            record["payload"] = json.loads(payload_text)
 
     if not isinstance(record, dict):
         raise ValueError("le log doit être un objet JSON")
@@ -51,7 +51,7 @@ def parse_log(text: str, source: tuple[str, int] = ("<texte>", 1)) -> Log:
         raise ValueError("horodatage local sans fuseau attendu")
     level = record["level"].strip().upper()
     if level not in LEVELS:
-        raise ValueError(f"niveau inconnu : {level}")
+        raise ValueError(f"niveau inconnu : {level!r}")
     address = str(ip_address(record["ip"].strip()))
     payload = record.get("payload", "")
     connection = None

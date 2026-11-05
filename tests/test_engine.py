@@ -119,6 +119,10 @@ class IngestionTests(unittest.TestCase):
             path.write_bytes(b"fe80::1%bad\xff\n")
             with self.assertRaisesRegex(ValueError, "blacklist:1"):
                 load_blacklist(path)
+            path.write_bytes(b"bad\x1b[2J\n")
+            with self.assertRaises(ValueError) as error:
+                load_blacklist(path)
+            self.assertNotIn("\x1b", str(error.exception))
 
 
 class RuleTests(unittest.TestCase):
@@ -204,8 +208,8 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(result["alerts"], {
                 "BRUTE_FORCE": 2, "BLACKLIST": 12, "CRITICAL": 1,
             })
-            alerts = [json.loads(line) for line in
-                      (out / "alerts.jsonl").read_text().splitlines()]
+            with (out / "alerts.jsonl").open(encoding="utf-8") as stream:
+                alerts = [json.loads(line) for line in stream]
             self.assertEqual(len(alerts), 15)
             saved = json.loads((out / "summary.json").read_text())
             self.assertEqual(saved, result)
@@ -246,18 +250,47 @@ class IntegrationTests(unittest.TestCase):
             path = out / "input.log"
             path.write_text(line + "\n", encoding="utf-8")
             result = subprocess.run(
-                [sys.executable, str(BASE_DIR / "main.py"),
+                [sys.executable, str(BASE_DIR / "main.py"), str(path),
                  "--output", directory, "--threshold", "2", "--stream-alerts",
-                 str(path), "-"],
+                 "-"],
                 input=(line + "\n").encode("utf-8"),
                 capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            alert = json.loads((out / "alerts.jsonl").read_text())
+            alert = json.loads((out / "alerts.jsonl").read_text(
+                encoding="utf-8"
+            ))
             self.assertEqual(json.loads(result.stdout), alert)
             self.assertIn(b"SECURELOG ENGINE", result.stderr)
             self.assertEqual(alert["rule"], "BRUTE_FORCE")
             self.assertEqual(alert["source"], ["<stdin>", 1])
+
+    def test_cli_does_not_print_terminal_control_from_log(self):
+        line = b"2026-09-29 10:00:00|INFO\x1b[2J|192.0.2.1|u|TEST|bad\n"
+        with tempfile.TemporaryDirectory() as directory:
+            for mode, status in (([], 0), (["--strict"], 1)):
+                with self.subTest(mode=mode):
+                    result = subprocess.run(
+                        [sys.executable, str(BASE_DIR / "main.py"),
+                         "--output", directory, *mode, "-"],
+                        input=line, capture_output=True,
+                    )
+                    self.assertEqual(result.returncode, status)
+                    self.assertIn(b"<stdin>:1", result.stderr)
+                    self.assertNotIn(b"\x1b", result.stderr)
+
+    def test_cli_treats_arguments_after_double_dash_as_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            (work / "-empty.log").touch()
+            result = subprocess.run(
+                [sys.executable, str(BASE_DIR / "main.py"),
+                 "--output", directory, "--", "-empty.log"],
+                cwd=work, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            summary = json.loads((work / "summary.json").read_bytes())
+            self.assertEqual(summary["total"], 0)
 
     def test_audit_does_not_export_values(self):
         with tempfile.TemporaryDirectory() as directory:

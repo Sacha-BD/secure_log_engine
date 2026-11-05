@@ -6,6 +6,7 @@ import logging
 import sys
 import tempfile
 from collections import defaultdict
+from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -139,19 +140,22 @@ def main() -> int:
         "--stream-alerts", action="store_true",
         help="émettre les alertes JSONL sur la sortie standard dès détection",
     )
-    options = parser.parse_args()
-    paths = options.files or [
-        BASE_DIR / "data/auth.log", BASE_DIR / "data/network.log"
-    ]
+    arguments = sys.argv[1:]
+    separator = arguments.index("--") if "--" in arguments else len(arguments)
+    options = parser.parse_intermixed_args(arguments[:separator])
+    paths = options.files + [Path(name) for name in arguments[separator + 1:]]
+    if not paths:
+        paths = [BASE_DIR / "data/auth.log", BASE_DIR / "data/network.log"]
     logging.basicConfig(
         level=logging.WARNING, format="%(levelname)s : %(message)s"
     )
     try:
         stdin = None
         if STDIN_PATH in paths:
-            sys.stdin.reconfigure(encoding="utf-8", errors="surrogateescape")
             stdin = sys.stdin
-        if options.stream_alerts:
+            if isinstance(stdin, TextIOWrapper):
+                stdin.reconfigure(encoding="utf-8", errors="surrogateescape")
+        if options.stream_alerts and isinstance(sys.stdout, TextIOWrapper):
             sys.stdout.reconfigure(encoding="utf-8")
         summary = run(
             paths, options.blacklist, options.output,
