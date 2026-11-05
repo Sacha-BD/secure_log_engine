@@ -1,4 +1,4 @@
-"""Pipeline paresseux : filtrage, parsing, puis normalisation."""
+"""Filtrer, parser et normaliser les lignes de logs."""
 
 import logging
 from collections.abc import Iterable, Iterator
@@ -9,7 +9,7 @@ from .parser import Log, parse_log
 
 
 def describe_payload(payload: Any) -> str:
-    """Router les trois formes prévues via le structural matching."""
+    """Créer un message selon le type de payload avec match-case."""
     match payload:
         case str() as text:
             return text.strip()
@@ -24,7 +24,7 @@ def describe_payload(payload: Any) -> str:
 
 
 def normalize_log(log: Log) -> Log:
-    """Enrichir chaque dictionnaire sans conserver les logs précédents."""
+    """Ajouter un message lisible au dictionnaire du log."""
     result = log.copy()
     result["message"] = describe_payload(log["payload"])
     return result
@@ -35,7 +35,7 @@ def process_logs(
     counters: dict[str, int],
     strict: bool = False,
 ) -> Iterator[Log]:
-    """Compter les entrées ignorées/rejetées et isoler leurs erreurs."""
+    """Traiter les lignes valides et compter les lignes refusées."""
     def counted_lines() -> Iterator[SourceLine]:
         for line in lines:
             counters["read"] += 1

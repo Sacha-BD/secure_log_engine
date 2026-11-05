@@ -1,4 +1,4 @@
-"""Règles indépendantes passées comme objets au moteur de sécurité."""
+"""Règles utilisées pour détecter des événements suspects."""
 
 from collections import deque
 from collections.abc import Callable, Iterator
@@ -12,7 +12,7 @@ History = dict[tuple[str, str], deque[bool]]
 
 
 def make_alert(log: Log, rule: str, message: str) -> Alert:
-    """Conserver la provenance exacte de l'événement déclencheur."""
+    """Créer le dictionnaire d'une alerte."""
     return {
         "rule": rule,
         "timestamp": log["timestamp"].isoformat(sep=" "),
@@ -24,12 +24,7 @@ def make_alert(log: Log, rule: str, message: str) -> Alert:
 
 
 def detect_bruteforce(log: Log, **config: Any) -> Alert | None:
-    """Détecter un bloc de X échecs consécutifs pour (IP, utilisateur).
-
-    Une fenêtre ne contient que X booléens au maximum. Les événements
-    réseau ne modifient pas les séries d'authentification. L'ordre utilisé
-    est celui des fichiers fournis, sans tri global en mémoire.
-    """
+    """Détecter X échecs consécutifs pour une IP et un utilisateur."""
     if log["event"] not in {"LOGIN_FAILED", "LOGIN_SUCCESS"}:
         return None
     threshold = config["threshold"]
@@ -40,17 +35,17 @@ def detect_bruteforce(log: Log, **config: Any) -> Alert | None:
     history = histories[identity]
     history.append(log["event"] == "LOGIN_FAILED")
 
-    # Retirer les succès en tête de fenêtre, devenus inutiles.
+    # Une réussite remet la série d'échecs à zéro.
     while history and not history[0]:
         history.popleft()
 
-    # Vérifier le cycle complet. Un succès intérieur interrompt le cycle.
+    # La boucle doit aller jusqu'au bout pour confirmer la série d'échecs.
     for failed in history:
         if failed:
             continue
         break
     else:
-        # Exécuté seulement si aucun break : tous les essais sont en échec.
+        # Ce else est exécuté seulement si aucun break n'a été rencontré.
         if len(history) == threshold:
             del histories[identity]
             return make_alert(
@@ -62,21 +57,21 @@ def detect_bruteforce(log: Log, **config: Any) -> Alert | None:
 
 
 def detect_blacklisted_ip(log: Log, **config: Any) -> Alert | None:
-    """Signaler chaque événement issu d'une adresse blacklistée."""
+    """Signaler un événement provenant d'une IP blacklistée."""
     if log["ip"] in config["blacklist"]:
         return make_alert(log, "BLACKLIST", "IP présente dans la blacklist")
     return None
 
 
 def detect_critical_event(log: Log, **config: Any) -> Alert | None:
-    """Signaler chaque événement de gravité maximale."""
+    """Signaler un événement de niveau CRITICAL."""
     if log["level"] == "CRITICAL":
         return make_alert(log, "CRITICAL", log["message"])
     return None
 
 
 def apply_security_rules(*args: Rule, **kwargs: Any) -> Iterator[Alert]:
-    """Recevoir N fonctions et leur transmettre une configuration nommée."""
+    """Appliquer toutes les fonctions reçues dans args."""
     log = kwargs.pop("log")
     threshold = kwargs.get("threshold", 5)
     if type(threshold) is not int or threshold < 1:

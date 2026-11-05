@@ -1,4 +1,4 @@
-"""Transformer les logs texte ou JSON en dictionnaires validés."""
+"""Transformer une ligne de log en dictionnaire Python."""
 
 import json
 from datetime import datetime
@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 
 
 class Log(TypedDict):
-    """Types des champs disponibles après parsing."""
+    """Structure d'un log après sa lecture."""
 
     timestamp: datetime
     level: str

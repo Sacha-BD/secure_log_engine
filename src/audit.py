@@ -1,4 +1,4 @@
-"""Audit des portées sans recopier les données ni les secrets éventuels."""
+"""Créer un rapport sur les variables présentes pendant l'exécution."""
 
 import json
 from collections.abc import Mapping
@@ -9,7 +9,7 @@ AUDIT_VERSION = "1.0"
 
 
 def describe_scope(scope: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    """Exporter nom, type et taille des conteneurs, sans leur contenu."""
+    """Récupérer le nom, le type et parfois la taille des variables."""
     result = {}
     for name, value in sorted(scope.items()):
         if name.startswith("__"):
@@ -26,7 +26,7 @@ def export_audit(
     global_scope: Mapping[str, Any],
     local_scope: Mapping[str, Any],
 ) -> None:
-    """Recevoir les portées réelles du pipeline et inspecter ce module."""
+    """Écrire les informations trouvées avec globals() et locals()."""
     report = {
         "version": AUDIT_VERSION,
         "pipeline_globals": describe_scope(global_scope),

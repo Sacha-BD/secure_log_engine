@@ -1,4 +1,4 @@
-"""Démonstration CLI du pipeline SecureLog Engine."""
+"""Point d'entrée du projet SecureLog Engine."""
 
 import argparse
 import json
@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 def positive_int(text: str) -> int:
-    """Valider le seuil avant d'ouvrir les sorties."""
+    """Vérifier que le seuil donné dans la commande est positif."""
     value = int(text)
     if value < 1:
         raise argparse.ArgumentTypeError(
@@ -43,12 +43,12 @@ def run(
     threshold: int = 5,
     strict: bool = False,
 ) -> dict:
-    """Faire circuler chaque log dans toutes les étapes, une seule fois."""
+    """Lancer toutes les étapes de l'analyse."""
     if type(threshold) is not int or threshold < 1:
         raise ValueError("le seuil doit être un entier strictement positif")
     if not paths:
         raise ValueError("au moins un fichier de logs est nécessaire")
-    # Vérifier les chemins avant de créer ou remplacer les résultats.
+    # On vérifie les fichiers avant de commencer l'analyse.
     inputs = [*paths, blacklist_path]
     for path in inputs:
         if not path.is_file():
@@ -65,10 +65,10 @@ def run(
     histories: History = {}
     alerts_by_rule: defaultdict[str, int] = defaultdict(int)
     logs = process_logs(read_multiple_logs(paths), counters, strict)
-    # Un échec préserve les derniers résultats complets.
+    # Les nouveaux résultats sont d'abord écrits dans un dossier temporaire.
     with tempfile.TemporaryDirectory(dir=output_dir) as temporary:
         staging = Path(temporary)
-        # Les alertes sont écrites immédiatement, sans liste globale.
+        # Chaque alerte est écrite dès qu'elle est détectée.
         with (staging / "alerts.jsonl").open("w", encoding="utf-8") as stream:
             for log in logs:
                 analyzer.update(log)
@@ -98,7 +98,7 @@ def run(
 
 
 def main() -> int:
-    """Lire les options et afficher un résumé compréhensible."""
+    """Lire les options de la commande puis afficher le résultat."""
     parser = argparse.ArgumentParser(
         description="Analyse progressive de logs système et réseau."
     )

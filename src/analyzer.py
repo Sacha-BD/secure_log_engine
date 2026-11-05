@@ -1,4 +1,4 @@
-"""Statistiques incrémentales : seuls les compteurs et identités restent."""
+"""Calculer les statistiques pendant la lecture des logs."""
 
 from collections import defaultdict
 from typing import Any
@@ -7,7 +7,7 @@ from .parser import Log
 
 
 class Analyzer:
-    """Regrouper un petit état partagé au fil de l'analyse."""
+    """Regrouper les compteurs utilisés pendant l'analyse."""
 
     def __init__(self) -> None:
         self.total = 0
@@ -17,7 +17,7 @@ class Analyzer:
         self.error_ips: set[str] = set()
 
     def update(self, log: Log) -> None:
-        """Consommer un seul log, puis l'oublier."""
+        """Mettre à jour les statistiques avec un nouveau log."""
         self.total += 1
         self.by_level[log["level"]] += 1
         self.by_user[log["user"]] += 1
@@ -26,7 +26,7 @@ class Analyzer:
             self.error_ips.add(log["ip"])
 
     def summary(self, blacklist: frozenset[str]) -> dict[str, Any]:
-        """Exporter des listes triées pour obtenir un JSON reproductible."""
+        """Préparer le résumé qui sera écrit dans le fichier JSON."""
         active = self.active_ips
         return {
             "total": self.total,
