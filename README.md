@@ -16,11 +16,11 @@ dans `data/` sont fictives.
 Le programme suit ces étapes :
 
 ```text
-lecture des fichiers
+lecture des fichiers ou de l'entrée standard
         ↓
-transformation des lignes en dictionnaires
+filtrage des lignes vides et des commentaires
         ↓
-filtrage et normalisation
+parsing, normalisation et rejet des lignes invalides
         ↓
 calcul des statistiques
         ↓
@@ -133,6 +133,19 @@ Chaque ligne valide devient un dictionnaire. Une connexion réseau est aussi
 représentée par un tuple `(IP, port, protocole)`, car ces trois informations ne
 doivent pas changer pendant le traitement.
 
+Deux formats sont acceptés en UTF-8.
+
+```text
+2026-09-29 08:00:00|INFO|192.0.2.10|alice|LOGIN_SUCCESS|Session ouverte
+{"timestamp":"2026-09-29 08:00:20","level":"INFO","ip":"192.0.2.10","user":"alice","event":"CONNECTION","payload":["192.0.2.100",443,"TCP"]}
+```
+
+Les champs texte obligatoires sont `timestamp`, `level`, `ip`, `user` et
+`event`. Le format du projet utilise des dates locales sans fuseau, des IP
+IPv4 ou IPv6 et les niveaux `INFO`, `WARNING`, `ERROR` et `CRITICAL`. Le
+payload peut être du texte, un objet JSON ou une connexion sous la forme
+`[IP, port, protocole]` avec `TCP` ou `UDP`.
+
 ### Détection de force brute
 
 Nous avons choisi un seuil de cinq échecs consécutifs. Le suivi se fait pour le
@@ -204,7 +217,7 @@ Le dossier `results/` contient ensuite :
 python -m unittest discover -s tests -v
 ```
 
-Les 27 tests couvrent notamment le parsing, les lignes invalides, la
+Les 29 tests couvrent notamment le parsing, les lignes invalides, la
 blacklist, les opérations sur les ensembles, la détection de force brute et
 le passage d'un flux par la CLI.
 
@@ -217,3 +230,6 @@ rediriger les nouvelles lignes vers l'entrée standard avec un outil comme
 
 La mémoire dépend de la taille des lignes et de la diversité des IP, des
 utilisateurs et des couples suivis par la règle de force brute.
+
+Les fichiers de résultats sont remplacés individuellement. Les analyses
+lancées en parallèle doivent utiliser des dossiers `--output` distincts.
