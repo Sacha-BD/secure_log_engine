@@ -4,3 +4,18 @@ __pycache__/
 .ipynb_checkpoints/
 results/
 .DS_Store
+
+# Variables d'environnement locales
+.env
+.env.*
+!.env.example
+
+# Logs locaux, sauf les exemples du projet
+*.log
+!data/auth.log
+!data/network.log
+
+# Caches et couverture des tests
+.pytest_cache/
+.coverage
+htmlcov/
