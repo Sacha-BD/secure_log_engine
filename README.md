@@ -62,9 +62,9 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-Le fichier `requirements.txt` est vide car aucune bibliothèque externe n'est
-utilisée. L'environnement `.venv` reste sur l'ordinateur de chaque membre et
-n'est pas envoyé sur GitHub.
+Le fichier `requirements.txt` contient le résultat de `python -m pip freeze`
+dans un environnement virtuel neuf. Il est vide car le moteur utilise
+uniquement la bibliothèque standard. L'environnement `.venv` reste local.
 
 ## Résultat de la démonstration
 
@@ -110,7 +110,7 @@ secure_log_engine/
 ```
 
 - `main.py` relie toutes les étapes et gère les options de la commande.
-- `ingestion.py` lit un ou plusieurs fichiers ligne par ligne.
+- `ingestion.py` lit les fichiers et les flux texte ligne par ligne.
 - `parser.py` vérifie les champs et crée les dictionnaires de logs.
 - `processing.py` filtre et normalise les données.
 - `analyzer.py` calcule les compteurs et les ensembles d'IP.
@@ -138,8 +138,11 @@ doivent pas changer pendant le traitement.
 Nous avons choisi un seuil de cinq échecs consécutifs. Le suivi se fait pour le
 couple `(IP, utilisateur)`. Une connexion réussie remet la série à zéro.
 
-Cette partie utilise volontairement `while`, `for`, `continue`, `break` et la
-clause `else` de la boucle, car ces instructions sont demandées dans l'énoncé.
+Quand la file d'une identité atteint le seuil, la boucle `for` examine les
+tentatives en les retirant. Elle passe à la suivante avec `continue` après un
+échec et s'interrompt avec `break` après un succès. Le `else` déclenche l'alerte
+si toutes les tentatives examinées étaient des échecs. La boucle `while`
+traite la file tant qu'elle contient assez de tentatives.
 
 ### Moteur de règles
 
@@ -175,9 +178,19 @@ python main.py --threshold 3
 # Choisir les fichiers à analyser
 python main.py data/auth.log data/network.log
 
+# Simuler un flux et afficher les alertes à mesure qu'elles sont détectées
+cat data/auth.log data/network.log | python main.py --stream-alerts -
+
 # Arrêter le programme dès la première ligne incorrecte
 python main.py --strict
 ```
+
+Le caractère `-` représente l'entrée standard UTF-8 et peut être placé parmi
+les fichiers une seule fois. Avec `--stream-alerts`, la sortie standard
+contient uniquement les alertes JSONL. Le résumé s'affiche sur la sortie
+d'erreur. Les fichiers de résultats sont publiés quand l'analyse se termine
+avec succès. En mode strict, les alertes déjà émises restent visibles si une
+ligne invalide interrompt ensuite le flux.
 
 Le dossier `results/` contient ensuite :
 
@@ -191,16 +204,16 @@ Le dossier `results/` contient ensuite :
 python -m unittest discover -s tests -v
 ```
 
-Les 22 tests vérifient notamment le parsing, les lignes invalides, la
+Les 27 tests couvrent notamment le parsing, les lignes invalides, la
 blacklist, les opérations sur les ensembles, la détection de force brute et
-l'exécution complète du programme.
+le passage d'un flux par la CLI.
 
 ## Limites
 
-Ce projet est une démonstration pédagogique. Il analyse des fichiers déjà
-créés, mais ne surveille pas un fichier en continu. Les alertes indiquent une
-activité à examiner : elles ne bloquent aucune connexion automatiquement.
+Les sources sont traitées dans l'ordre donné à la commande, sans tri par
+horodatage. Pour surveiller un fichier qui continue de grandir, il faut
+rediriger les nouvelles lignes vers l'entrée standard avec un outil comme
+`tail -f`. Les alertes signalent une activité à examiner.
 
-Les fichiers sont traités dans l'ordre donné à la commande. Le programme ne les
-reclasse pas par date, car cela demanderait de conserver beaucoup plus de
-données en mémoire.
+La mémoire dépend de la taille des lignes et de la diversité des IP, des
+utilisateurs et des couples suivis par la règle de force brute.
