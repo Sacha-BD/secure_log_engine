@@ -5,22 +5,25 @@ Python **3.10+**, bibliothèque standard uniquement. Le programme lit, valide,
 normalise, compte et détecte des événements suspects sans charger les fichiers
 complets en mémoire. Toutes les données fournies sont fictives.
 
-## Démarrer sur ce Mac
+## Prérequis
 
-Le projet et son environnement isolé sont déjà créés. Dans un terminal :
+- Python 3.10 ou une version plus récente ;
+- Git ;
+- un terminal. VS Code est facultatif.
+
+Le projet fonctionne sur macOS, Linux et Windows. Il utilise uniquement la
+bibliothèque standard de Python et ne dépend d'aucun chemin propre à un ordinateur.
+
+## Installation depuis GitHub
+
+Commencer par cloner le dépôt et entrer dans son dossier :
 
 ```bash
-cd /Users/sacha/VSCodeProjects/secure_log_engine
-source .venv/bin/activate
-python main.py
-python -m unittest discover -s tests -v
+git clone https://github.com/Sacha-BD/secure_log_engine.git
+cd secure_log_engine
 ```
 
-Dans VS Code : ouvrir ce dossier, sélectionner l'interpréteur
-`.venv/bin/python`, puis lancer `main.py`. Le rapport déjà exécuté se trouve
-dans `report/rapport.ipynb` et peut se lire sans relancer ses cellules.
-
-## Réinstaller ailleurs
+### macOS ou Linux
 
 ```bash
 python3 -m venv .venv
@@ -29,14 +32,33 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-Sous Windows, activer avec `.venv\Scripts\Activate.ps1` dans PowerShell.
-`requirements.txt` est volontairement **vide** : il a été généré par
-`python -m pip freeze` dans l'environnement neuf. Le moteur, les tests et
-les cellules du rapport n'importent que la bibliothèque standard.
-Ne pas inclure `.venv` dans le dépôt ou le rendu. Après ajout d'une dépendance,
-regénérer ce fichier avec `python -m pip freeze > requirements.txt`.
-Un éditeur de notebooks et son noyau sont des outils de lecture/exécution
-optionnels ; les résultats enregistrés sont consultables sans installer Jupyter.
+### Windows avec PowerShell
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python main.py
+```
+
+`requirements.txt` est volontairement vide : le programme, les tests et le
+rapport utilisent uniquement la bibliothèque standard. L'environnement `.venv`
+reste local à chaque ordinateur et ne doit pas être ajouté au dépôt Git.
+
+Dans VS Code, ouvrir le dossier `secure_log_engine`, sélectionner l'interpréteur
+Python situé dans `.venv`, puis lancer `main.py`. Le rapport déjà exécuté se
+trouve dans `report/rapport.ipynb` et peut se lire sans installer Jupyter.
+
+## Vérifier l'installation
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Les 22 tests doivent se terminer par `OK`. Le lancement de `main.py` affiche
+trois avertissements prévus : le jeu de démonstration contient volontairement
+trois lignes incorrectes afin de montrer la gestion des erreurs. L'analyse doit
+ensuite annoncer 22 logs valides et deux alertes de force brute.
 
 ## Fichiers à comprendre
 
@@ -196,7 +218,7 @@ L'état `histories` appartient à une seule analyse et son seuil reste fixe.
 | `*args`, `**kwargs`, fonctions objets | `apply_security_rules` |
 | `globals()`, `locals()` | `run`, `export_audit` |
 | Typage, exceptions, PEP8 | annotations, erreurs contrôlées, tests et contrôle de style |
-| Dépôt et rapport | dépôt Git local, `report/rapport.ipynb` exécuté |
+| Dépôt et rapport | dépôt GitHub, `report/rapport.ipynb` exécuté |
 
 ## Mémoire et limites
 
