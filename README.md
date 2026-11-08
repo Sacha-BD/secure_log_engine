@@ -235,11 +235,16 @@ Le dossier `results/` contient ensuite :
 python -m unittest discover -s tests -v
 ```
 
-Les 43 tests couvrent notamment le parsing, les lignes invalides, la
+Les 45 tests couvrent notamment le parsing, les lignes invalides, la
 blacklist, les opérations sur les ensembles, la détection de force brute et
 le passage d'un flux par la CLI. Ils vérifient aussi qu'une alerte est émise
 avant la fermeture de l'entrée standard et que les sorties du notebook
-correspondent à une nouvelle exécution de ses cellules. Les tests et les
+correspondent à une nouvelle exécution de ses cellules. Les échecs de
+publication sont simulés dans 48 cas : chaque étape de sauvegarde et de
+remplacement, avec toutes les combinaisons de résultats préexistants.
+Les tests contrôlent également la conservation des anciens résultats en cas
+d'erreur d'export et le traitement des octets UTF-8 invalides sur l'entrée
+standard, en modes normal et strict. Les tests et les
 cellules utilisent uniquement la bibliothèque standard ; l'installation de
 Jupyter n'est pas nécessaire. Le notebook peut être consulté sur GitHub
 avec ses sorties sauvegardées.
