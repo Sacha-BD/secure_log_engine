@@ -353,6 +353,51 @@ class IntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "input.log:1"):
                 run([path], blacklist, path.parent, strict=True)
 
+    def test_cli_invalid_utf8_stdin_obeys_strict_mode(self):
+        lines = (
+            b"bad byte: \xff\n"
+            b"2026-09-29 10:00:00|CRITICAL|192.0.2.1|u|TEST|ok\n"
+        )
+        for strict in (False, True):
+            with self.subTest(strict=strict):
+                with tempfile.TemporaryDirectory() as directory:
+                    out = Path(directory)
+                    previous = {
+                        name: b"ancien resultat" for name in (
+                            "summary.json", "alerts.jsonl", "audit.json",
+                        )
+                    }
+                    for name, content in previous.items():
+                        (out / name).write_bytes(content)
+                    result = subprocess.run(
+                        [sys.executable, str(BASE_DIR / "main.py"),
+                         "--output", directory, "--stream-alerts",
+                         *(["--strict"] if strict else []), "-"],
+                        input=lines, capture_output=True, timeout=10,
+                    )
+                    self.assertEqual(result.returncode, int(strict))
+                    self.assertIn(b"<stdin>:1", result.stderr)
+                    self.assertNotIn(b"Traceback", result.stderr)
+                    if strict:
+                        self.assertEqual(result.stdout, b"")
+                        for name, content in previous.items():
+                            self.assertEqual(
+                                (out / name).read_bytes(), content,
+                            )
+                    else:
+                        alert = json.loads(result.stdout)
+                        self.assertEqual(alert["rule"], "CRITICAL")
+                        self.assertEqual(alert["source"], ["<stdin>", 2])
+                        summary = json.loads(
+                            (out / "summary.json").read_bytes()
+                        )
+                        self.assertEqual(summary["input"], {
+                            "read": 2, "ignored": 0, "invalid": 1, "valid": 1,
+                        })
+                    self.assertCountEqual(
+                        (path.name for path in out.iterdir()), previous,
+                    )
+
     def test_cli_combines_stdin_and_files_in_order(self):
         line = "2026-09-29 10:00:00|ERROR|192.0.2.1|alice|LOGIN_FAILED|échec"
         with tempfile.TemporaryDirectory() as directory:
@@ -550,28 +595,79 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(summary.read_text(), "ancien résultat")
 
     def test_publication_failure_restores_previous_results(self):
-        with tempfile.TemporaryDirectory() as directory:
-            out = Path(directory)
-            source = out / "empty.log"
-            source.touch()
-            alerts = out / "alerts.jsonl"
-            alerts.write_bytes(b"anciennes alertes")
-            audit = out / "audit.json"
-            audit.write_bytes(b"ancien audit")
-            replace = Path.replace
+        names = ("summary.json", "alerts.jsonl", "audit.json")
+        for present, failed_name, operation in product(
+            product((False, True), repeat=3), names, ("rename", "replace"),
+        ):
+            with self.subTest(
+                present=present, failed_name=failed_name, operation=operation,
+            ), tempfile.TemporaryDirectory() as directory:
+                out = Path(directory)
+                source = out / "empty.log"
+                source.touch()
+                previous = {}
+                for name, exists in zip(names, present):
+                    if exists:
+                        previous[name] = f"ancien {name}".encode()
+                        (out / name).write_bytes(previous[name])
+                original = getattr(Path, operation)
 
-            def fail_on_new_alerts(path: Path, target: Path) -> Path:
-                if target == alerts and path.parent.name.startswith("tmp"):
-                    raise PermissionError("publication interrompue")
-                return replace(path, target)
+                def fail_publication(path: Path, target: Path) -> Path:
+                    backing_up = (
+                        operation == "rename" and path == out / failed_name
+                    )
+                    publishing = (
+                        operation == "replace" and target == out / failed_name
+                        and path.parent != out / ".securelog-publish"
+                    )
+                    if backing_up or publishing:
+                        raise PermissionError("publication interrompue")
+                    return original(path, target)
 
-            with patch.object(Path, "replace", fail_on_new_alerts):
-                with self.assertRaisesRegex(PermissionError, "interrompue"):
-                    run([source], BASE_DIR / "data/blacklist.txt", out)
+                with patch.object(Path, operation, fail_publication):
+                    with self.assertRaisesRegex(
+                        PermissionError, "interrompue",
+                    ):
+                        run([source], BASE_DIR / "data/blacklist.txt", out)
 
-            self.assertEqual(alerts.read_bytes(), b"anciennes alertes")
-            self.assertEqual(audit.read_bytes(), b"ancien audit")
-            self.assertCountEqual(out.iterdir(), [source, alerts, audit])
+                for name, content in previous.items():
+                    self.assertEqual((out / name).read_bytes(), content)
+                self.assertCountEqual(
+                    (path.name for path in out.iterdir()),
+                    [source.name, *previous],
+                )
+
+    def test_export_failure_preserves_previous_results(self):
+        for failed_name in ("summary.json", "audit.json"):
+            with self.subTest(failed_name=failed_name):
+                with tempfile.TemporaryDirectory() as directory:
+                    out = Path(directory)
+                    source = out / "empty.log"
+                    source.touch()
+                    previous = {
+                        name: f"ancien {name}".encode() for name in (
+                            "summary.json", "alerts.jsonl", "audit.json",
+                        )
+                    }
+                    for name, content in previous.items():
+                        (out / name).write_bytes(content)
+                    write_text = Path.write_text
+
+                    def fail_export(path: Path, *args, **kwargs):
+                        if path.name == failed_name:
+                            raise OSError("espace disque insuffisant")
+                        return write_text(path, *args, **kwargs)
+
+                    with patch.object(Path, "write_text", fail_export):
+                        with self.assertRaisesRegex(OSError, "espace disque"):
+                            run([source], BASE_DIR / "data/blacklist.txt", out)
+
+                    for name, content in previous.items():
+                        self.assertEqual((out / name).read_bytes(), content)
+                    self.assertCountEqual(
+                        (path.name for path in out.iterdir()),
+                        [source.name, *previous],
+                    )
 
     def test_publication_does_not_touch_another_run(self):
         with tempfile.TemporaryDirectory() as directory:
