@@ -1,0 +1,9 @@
+Bonjour,
+
+Voici le lien vers notre dépôt GitHub pour le projet SecureLog Engine :
+https://github.com/Sacha-BD/secure_log_engine
+
+Cordialement,
+Lukas MAUFFRÉ
+Sacha BEHLOULI-DROLLÉE
+Jeanne TONDA
