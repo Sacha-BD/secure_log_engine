@@ -8,6 +8,8 @@ import unittest
 from datetime import datetime
 from itertools import product
 from pathlib import Path
+from queue import Queue
+from threading import Thread
 
 from main import BASE_DIR, run
 from src.analyzer import Analyzer
@@ -342,6 +344,77 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn(b"SECURELOG ENGINE", result.stderr)
             self.assertEqual(alert["rule"], "BRUTE_FORCE")
             self.assertEqual(alert["source"], ["<stdin>", 1])
+
+    def test_cli_emits_alert_before_stdin_is_closed(self):
+        line = b"2026-09-29 10:00:00|ERROR|192.0.2.1|u|LOGIN_FAILED|bad\n"
+        with tempfile.TemporaryDirectory() as directory:
+            with subprocess.Popen(
+                [sys.executable, str(BASE_DIR / "main.py"),
+                 "--output", directory, "--threshold", "2",
+                 "--stream-alerts", "-"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ) as process:
+                received = Queue()
+                reader = Thread(
+                    target=lambda: received.put(process.stdout.readline()),
+                    daemon=True,
+                )
+                reader.start()
+                try:
+                    process.stdin.write(line * 2)
+                    process.stdin.flush()
+                    alert = json.loads(received.get(timeout=10))
+                    self.assertEqual(alert["rule"], "BRUTE_FORCE")
+                    self.assertIsNone(process.poll())
+                    self.assertFalse(
+                        (Path(directory) / "summary.json").exists()
+                    )
+                    _, stderr = process.communicate(timeout=10)
+                    self.assertEqual(process.returncode, 0, stderr)
+                    saved = json.loads(
+                        (Path(directory) / "alerts.jsonl").read_bytes()
+                    )
+                    self.assertEqual(saved, alert)
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate(timeout=10)
+                    reader.join(timeout=10)
+
+    def test_invalid_thresholds_and_missing_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for threshold in (0, -1, True, 1.5, "5"):
+                with self.subTest(threshold=threshold):
+                    with self.assertRaises(ValueError):
+                        run([BASE_DIR / "data/auth.log"],
+                            BASE_DIR / "data/blacklist.txt", Path(directory),
+                            threshold=threshold)
+            with self.assertRaises(ValueError):
+                run([], BASE_DIR / "data/blacklist.txt", Path(directory))
+
+    def test_notebook_examples_match_saved_results(self):
+        notebook = json.loads(
+            (BASE_DIR / "report/rapport.ipynb").read_text(encoding="utf-8")
+        )
+        source = "\n".join(
+            "".join(cell["source"]) for cell in notebook["cells"]
+            if cell["cell_type"] == "code"
+        )
+        expected = "".join(
+            "".join(output["text"])
+            for cell in notebook["cells"]
+            for output in cell.get("outputs", [])
+            if output.get("name") == "stdout"
+        )
+        for cwd in (BASE_DIR, BASE_DIR / "report"):
+            with self.subTest(cwd=cwd):
+                result = subprocess.run(
+                    [sys.executable, "-X", "utf8", "-c", source], cwd=cwd,
+                    capture_output=True, encoding="utf-8", timeout=30,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, expected)
 
     def test_cli_does_not_print_terminal_control_from_log(self):
         line = b"2026-09-29 10:00:00|INFO\x1b[2J|192.0.2.1|u|TEST|bad\n"
