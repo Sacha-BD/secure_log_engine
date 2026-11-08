@@ -63,6 +63,54 @@ class ParsingTests(unittest.TestCase):
         )
         self.assertIn("TCP", describe_payload(("192.0.2.1", 443, "TCP")))
 
+    def test_invalid_json_values_are_rejected_in_all_fields(self):
+        base = {
+            "timestamp": "2026-09-29 10:00:00", "level": "INFO",
+            "ip": "192.0.2.1", "user": "alice", "event": "TEST",
+            "payload": {"level": "ERROR", "code": 0},
+        }
+        values = [float("nan"), float("inf"), float("-inf"), "\ud800"]
+        for value in values:
+            with self.subTest(value=repr(value)):
+                record = {**base, "extra": {"nested": [value]}}
+                with self.assertRaises(ValueError):
+                    parse_log(json.dumps(record))
+                payload = {**base["payload"], "hidden": [value]}
+                text = "2026-09-29 10:00:00|INFO|192.0.2.1|u|TEST|"
+                with self.assertRaises(ValueError):
+                    parse_log(text + json.dumps(payload))
+        with self.assertRaises(ValueError):
+            parse_log(json.dumps({**base, "event": "\ud800"}))
+        with self.assertRaises(ValueError):
+            parse_log(json.dumps({**base, "payload": {"\ud800": 1}}))
+        with self.assertRaises(ValueError):
+            parse_log(json.dumps(base).replace('"code": 0', '"code": 1e999'))
+
+    def test_valid_nested_json_and_unicode_are_preserved(self):
+        payload = {"data": [None, True, -2, 1.25, {"texte": "été 😀"}]}
+        text = "2026-09-29 10:00:00|INFO|192.0.2.1|u|TEST|"
+        log = parse_log(text + json.dumps(payload))
+        self.assertEqual(log["payload"], payload)
+
+    def test_bad_json_values_follow_rejection_policy(self):
+        prefix = "2026-09-29 10:00:00|INFO|192.0.2.1|u|TEST|"
+        bad_payloads = [
+            '{"nested":[NaN]}', '{"value":1e999}',
+            r'{"level":"ERROR","code":0,"hidden":"\ud800"}',
+            '{"nested":' + '[' * 2000 + '0' + ']' * 2000 + '}',
+        ]
+        for payload in bad_payloads:
+            with self.subTest(payload=payload[:60]):
+                lines = [("test", 1, prefix + payload),
+                         ("test", 2, prefix + "valide")]
+                counters = dict(read=0, ignored=0, invalid=0, valid=0)
+                with self.assertLogs(level="WARNING"):
+                    logs = list(process_logs(lines, counters))
+                self.assertEqual(len(logs), 1)
+                self.assertEqual(counters["invalid"], 1)
+                with self.assertRaisesRegex(ValueError, "test:1"):
+                    list(process_logs(lines, counters, strict=True))
+
     def test_pipeline_is_lazy_and_counts_rejections(self):
         counters = dict(read=0, ignored=0, invalid=0, valid=0)
         lines = [

@@ -1,6 +1,7 @@
 """Transformer une ligne de log en dictionnaire Python."""
 
 import json
+import math
 from datetime import datetime
 from ipaddress import ip_address
 from typing import Any, TypedDict
@@ -23,6 +24,21 @@ class Log(TypedDict):
 LEVELS = frozenset({"INFO", "WARNING", "ERROR", "CRITICAL"})
 
 
+def validate_json(value: Any) -> None:
+    """Refuser les nombres non finis et les chaînes Unicode invalides."""
+    if isinstance(value, str):
+        value.encode("utf-8")
+    elif isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("nombre JSON non fini")
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            validate_json(key)
+            validate_json(item)
+    elif isinstance(value, list):
+        for item in value:
+            validate_json(item)
+
+
 def parse_log(text: str, source: tuple[str, int] = ("<texte>", 1)) -> Log:
     """Accepter un objet JSON ou six champs séparés par |."""
     text = text.strip()
@@ -42,6 +58,9 @@ def parse_log(text: str, source: tuple[str, int] = ("<texte>", 1)) -> Log:
 
     if not isinstance(record, dict):
         raise ValueError("le log doit être un objet JSON")
+    # json.loads accepte NaN/Infinity et les surrogates Unicode isolés.
+    # Vérifier aussi les champs qui ne servent pas au message normalisé.
+    validate_json(record)
     for field in ("timestamp", "level", "ip", "user", "event"):
         if not isinstance(record.get(field), str) or not record[field].strip():
             raise ValueError(f"champ texte absent ou vide : {field}")
