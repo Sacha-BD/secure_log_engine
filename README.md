@@ -68,7 +68,8 @@ uniquement la bibliothèque standard. L'environnement `.venv` reste local.
 
 ## Résultat de la démonstration
 
-Avec les fichiers fournis, la commande `python main.py` doit afficher :
+Avec les fichiers fournis, la commande `python main.py` affiche ce résumé,
+suivi du chemin du dossier des résultats :
 
 ```text
 SECURELOG ENGINE
@@ -90,6 +91,8 @@ forment pas une série de cinq.
 
 ```text
 secure_log_engine/
+├── .gitignore
+├── README.md
 ├── main.py
 ├── requirements.txt
 ├── data/
@@ -97,6 +100,7 @@ secure_log_engine/
 │   ├── network.log
 │   └── blacklist.txt
 ├── src/
+│   ├── __init__.py
 │   ├── ingestion.py
 │   ├── parser.py
 │   ├── processing.py
@@ -104,6 +108,7 @@ secure_log_engine/
 │   ├── rules.py
 │   └── audit.py
 ├── tests/
+│   ├── __init__.py
 │   ├── test_engine.py
 │   └── benchmark_memory.py
 └── report/
@@ -151,8 +156,11 @@ Unicode invalides sont rejetés, y compris dans les champs JSON imbriqués.
 
 ### Détection de force brute
 
-Nous avons choisi un seuil de cinq échecs consécutifs. Le suivi se fait pour le
+Le seuil par défaut est de cinq échecs consécutifs, modifiable avec
+`--threshold`. Le suivi se fait pour le
 couple `(IP, utilisateur)`. Une connexion réussie remet la série à zéro.
+Chaque bloc disjoint de cinq échecs produit une alerte avec le seuil par défaut :
+dix échecs consécutifs produisent donc deux alertes.
 
 Quand la file d'une identité atteint le seuil, la boucle `for` examine les
 tentatives en les retirant. Elle passe à la suivante avec `continue` après un
