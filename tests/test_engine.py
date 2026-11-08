@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime
+from io import StringIO
 from itertools import product
 from pathlib import Path
 from queue import Queue
@@ -459,6 +460,22 @@ class IntegrationTests(unittest.TestCase):
                     self.assertIn(b"<stdin>:1", result.stderr)
                     self.assertNotIn(b"\x1b", result.stderr)
 
+    def test_diagnostics_escape_control_characters_in_source_names(self):
+        for strict in (False, True):
+            with self.subTest(strict=strict):
+                lines = [("input\x1b[2J.log", 1, "bad")]
+                counters = dict(read=0, ignored=0, invalid=0, valid=0)
+                if strict:
+                    with self.assertRaises(ValueError) as error:
+                        list(process_logs(lines, counters, strict=True))
+                    message = str(error.exception)
+                else:
+                    with self.assertLogs(level="WARNING") as warnings:
+                        list(process_logs(lines, counters))
+                    message = warnings.output[0]
+                self.assertIn(r"\x1b", message)
+                self.assertNotIn("\x1b", message)
+
     def test_cli_treats_arguments_after_double_dash_as_files(self):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
@@ -498,6 +515,28 @@ class IntegrationTests(unittest.TestCase):
                     BASE_DIR / "data/blacklist.txt", out, strict=True)
             self.assertEqual(old.read_text(), "ancien résultat")
             self.assertEqual(list(out.iterdir()), [old])
+
+    def test_strict_failure_closes_input_before_propagating_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "input.log"
+            source.touch()
+            input_stream = StringIO("invalide\n")
+            open_path = Path.open
+
+            def open_tracked(path: Path, *args, **kwargs):
+                if path == source:
+                    return input_stream
+                return open_path(path, *args, **kwargs)
+
+            with patch.object(Path, "open", open_tracked):
+                try:
+                    run([source], BASE_DIR / "data/blacklist.txt", root,
+                        strict=True)
+                except ValueError:
+                    self.assertTrue(input_stream.closed)
+                else:
+                    self.fail("Le mode strict devait lever une exception")
 
     def test_directory_at_output_path_preserves_previous_results(self):
         with tempfile.TemporaryDirectory() as directory:

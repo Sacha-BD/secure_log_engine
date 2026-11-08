@@ -7,13 +7,19 @@ import shutil
 import sys
 import tempfile
 from collections import defaultdict
+from contextlib import closing
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Any, TextIO
 
 from src.analyzer import Analyzer
 from src.audit import export_audit
-from src.ingestion import STDIN_PATH, load_blacklist, read_multiple_logs
+from src.ingestion import (
+    STDIN_PATH,
+    display_source,
+    load_blacklist,
+    read_multiple_logs,
+)
 from src.processing import process_logs
 from src.rules import (
     History,
@@ -114,10 +120,12 @@ def run(
     analyzer = Analyzer()
     histories: History = {}
     alerts_by_rule: defaultdict[str, int] = defaultdict(int)
-    sources = read_multiple_logs(paths, stdin=stdin)
-    logs = process_logs(sources, counters, strict)
     # Les nouveaux résultats sont d'abord écrits dans un dossier temporaire.
-    with tempfile.TemporaryDirectory(dir=output_dir) as temporary:
+    with (
+        closing(read_multiple_logs(paths, stdin=stdin)) as sources,
+        tempfile.TemporaryDirectory(dir=output_dir) as temporary,
+    ):
+        logs = process_logs(sources, counters, strict)
         staging = Path(temporary)
         # Chaque alerte est écrite dès qu'elle est détectée.
         with (staging / "alerts.jsonl").open("w", encoding="utf-8") as stream:
@@ -203,7 +211,7 @@ def main() -> int:
             alert_output=sys.stdout if options.stream_alerts else None,
         )
     except (OSError, ValueError) as error:
-        print(f"Erreur : {error}", file=sys.stderr)
+        print(f"Erreur : {display_source(str(error))}", file=sys.stderr)
         return 1
     console = sys.stderr if options.stream_alerts else sys.stdout
     print("SECURELOG ENGINE", file=console)
@@ -211,7 +219,10 @@ def main() -> int:
     print(f"Lignes rejetées : {summary['input']['invalid']}", file=console)
     print(f"Par niveau : {summary['by_level']}", file=console)
     print(f"Alertes : {summary['alerts']}", file=console)
-    print(f"Résultats : {options.output.resolve()}", file=console)
+    print(
+        f"Résultats : {display_source(str(options.output.resolve()))}",
+        file=console,
+    )
     return 0
 
 

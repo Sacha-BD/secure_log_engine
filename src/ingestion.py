@@ -1,6 +1,6 @@
 """Lire les fichiers de logs ligne par ligne."""
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator
 from pathlib import Path
 from typing import TextIO
 
@@ -9,6 +9,11 @@ from .addresses import normalize_ip
 # Le tuple contient le fichier, le numéro de ligne et son texte.
 SourceLine = tuple[str, int, str]
 STDIN_PATH = Path("-")
+
+
+def display_source(source: str) -> str:
+    """Échapper les caractères de contrôle dans les diagnostics."""
+    return source if source.isprintable() else repr(source)
 
 
 def read_stream(stream: Iterable[str], source: str) -> Iterator[SourceLine]:
@@ -25,7 +30,7 @@ def read_logs(path: Path) -> Iterator[SourceLine]:
 
 def read_multiple_logs(
     paths: Iterable[Path], *, stdin: TextIO | None = None,
-) -> Iterator[SourceLine]:
+) -> Generator[SourceLine, None, None]:
     """Lire les fichiers et l'entrée standard dans l'ordre fourni."""
     for path in paths:
         if path == STDIN_PATH and stdin is not None:
@@ -46,6 +51,7 @@ def load_blacklist(path: Path) -> frozenset[str]:
             addresses.add(normalize_ip(value))
         except ValueError as error:
             raise ValueError(
-                f"{source}:{number} : IP blacklist invalide : {value!r}"
+                f"{display_source(source)}:{number} : "
+                f"IP blacklist invalide : {value!r}"
             ) from error
     return frozenset(addresses)

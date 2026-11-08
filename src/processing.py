@@ -4,7 +4,7 @@ import logging
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from .ingestion import SourceLine
+from .ingestion import SourceLine, display_source
 from .parser import Log, parse_log
 
 
@@ -54,11 +54,10 @@ def process_logs(
             normalized = normalize_log(parse_log(text, (source, number)))
         except (ValueError, RecursionError) as error:
             counters["invalid"] += 1
+            location = f"{display_source(source)}:{number}"
             if strict:
-                raise ValueError(f"{source}:{number} : {error}") from error
-            logging.warning(
-                "%s:%s : ligne rejetée (%s)", source, number, error
-            )
+                raise ValueError(f"{location} : {error}") from error
+            logging.warning("%s : ligne rejetée (%s)", location, error)
             return None
         counters["valid"] += 1
         return normalized
