@@ -22,11 +22,9 @@ filtrage des lignes vides et des commentaires
         ↓
 parsing, normalisation et rejet des lignes invalides
         ↓
-calcul des statistiques
+mise à jour des statistiques et application des règles pour chaque log
         ↓
-application des règles de sécurité
-        ↓
-création des fichiers de résultats
+écriture des alertes au fil de l'eau, puis publication des résultats
 ```
 
 Les trois règles de sécurité détectent :
@@ -124,7 +122,8 @@ secure_log_engine/
 - `analyzer.py` calcule les compteurs et les ensembles d'IP.
 - `rules.py` contient les règles de sécurité.
 - `audit.py` crée un rapport simple sur les variables utilisées.
-- `rapport.ipynb` présente le fonctionnement et les résultats du projet.
+- Le [rapport de démonstration](report/rapport.ipynb) présente le
+  fonctionnement du moteur et les résultats des mesures.
 
 Nous conseillons de lire les fichiers dans cet ordre : `main.py`, puis les
 modules de `src/` dans l'ordre de la liste ci-dessus.
@@ -149,7 +148,9 @@ Deux formats sont acceptés en UTF-8.
 ```
 
 Les champs texte obligatoires sont `timestamp`, `level`, `ip`, `user` et
-`event`. Le format du projet utilise des dates locales sans fuseau, des IP
+`event`. Dans le format séparé par `|`, le sixième champ contient le payload
+et peut être vide. Dans le format JSON, le champ `payload` est facultatif.
+Le format du projet utilise des dates locales sans fuseau, des IP
 IPv4 ou IPv6 et les niveaux `INFO`, `WARNING`, `ERROR` et `CRITICAL`. Le
 payload peut être du texte, un objet JSON ou une connexion sous la forme
 `[IP, port, protocole]` avec `TCP` ou `UDP`.
@@ -209,6 +210,9 @@ python main.py --threshold 3
 # Choisir les fichiers à analyser
 python main.py data/auth.log data/network.log
 
+# Choisir la liste de blocage et le dossier de résultats
+python main.py --blacklist data/blacklist.txt --output results/demo
+
 # Simuler un flux et afficher les alertes à mesure qu'elles sont détectées
 cat data/auth.log data/network.log | python main.py --stream-alerts -
 
@@ -227,7 +231,8 @@ Le dossier `results/` contient ensuite :
 
 - `summary.json` : les statistiques générales ;
 - `alerts.jsonl` : les alertes détectées, une par ligne ;
-- `audit.json` : les noms et types des variables observées pendant l'exécution.
+- `audit.json` : les noms, types et, selon le type, tailles des variables
+  observées pendant l'exécution.
 
 ## Tests
 
@@ -238,8 +243,8 @@ python -m unittest discover -s tests -v
 Les 45 tests couvrent notamment le parsing, les lignes invalides, la
 blacklist, les opérations sur les ensembles, la détection de force brute et
 le passage d'un flux par la CLI. Ils vérifient aussi qu'une alerte est émise
-avant la fermeture de l'entrée standard et que les sorties du notebook
-correspondent à une nouvelle exécution de ses cellules. Les échecs de
+avant la fermeture de l'entrée standard et que la sortie standard du notebook
+correspond à une nouvelle exécution de ses cellules. Les échecs de
 publication sont simulés dans 48 cas : chaque étape de sauvegarde et de
 remplacement, avec toutes les combinaisons de résultats préexistants.
 Les tests contrôlent également la conservation des anciens résultats en cas
@@ -275,9 +280,10 @@ utilisateurs, ainsi que du nombre d'échecs en attente pour les couples suivis
 par la règle de force brute. Le seuil borne le nombre d'échecs en attente par
 couple.
 
-Une seule analyse peut publier dans un dossier de résultats à la fois. En cas
-d'erreur d'écriture pendant la publication, les résultats précédents sont
-restaurés. Les fichiers restent remplacés individuellement. Pour conserver
-les résultats de chaque analyse parallèle, utilisez des dossiers `--output`
-distincts. Après une interruption brutale pendant la publication, le dossier
+Une seule analyse peut publier dans un dossier de résultats à la fois. Les
+fichiers sont remplacés individuellement. Si une écriture échoue pendant la
+publication, le moteur tente de restaurer les résultats précédents. Après une
+interruption brutale ou un échec de la restauration, le dossier
 `.securelog-publish` peut contenir les sauvegardes à restaurer avant de relancer.
+Utilisez des dossiers `--output` distincts pour conserver les résultats de
+chaque analyse parallèle.
