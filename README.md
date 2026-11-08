@@ -101,6 +101,7 @@ secure_log_engine/
 │   └── blacklist.txt
 ├── src/
 │   ├── __init__.py
+│   ├── addresses.py
 │   ├── ingestion.py
 │   ├── parser.py
 │   ├── processing.py
@@ -116,6 +117,7 @@ secure_log_engine/
 ```
 
 - `main.py` relie toutes les étapes et gère les options de la commande.
+- `addresses.py` fournit une notation IP commune aux logs et à la blacklist.
 - `ingestion.py` lit les fichiers et les flux texte ligne par ligne.
 - `parser.py` vérifie les champs et crée les dictionnaires de logs.
 - `processing.py` filtre et normalise les données.
@@ -233,7 +235,7 @@ Le dossier `results/` contient ensuite :
 python -m unittest discover -s tests -v
 ```
 
-Les 37 tests couvrent notamment le parsing, les lignes invalides, la
+Les 43 tests couvrent notamment le parsing, les lignes invalides, la
 blacklist, les opérations sur les ensembles, la détection de force brute et
 le passage d'un flux par la CLI. Ils vérifient aussi qu'une alerte est émise
 avant la fermeture de l'entrée standard et que les sorties du notebook
@@ -242,7 +244,7 @@ cellules utilisent uniquement la bibliothèque standard ; l'installation de
 Jupyter n'est pas nécessaire. Le notebook peut être consulté sur GitHub
 avec ses sorties sauvegardées.
 
-La suite passe sous Python 3.10.22, 3.12.16 et 3.14.10.
+La suite passe sous Python 3.10.22, 3.12.16, 3.14.10 et 3.15.2.
 
 Pour reproduire les mesures mémoire du rapport :
 
@@ -263,8 +265,10 @@ horodatage. Pour surveiller un fichier qui continue de grandir, il faut
 rediriger les nouvelles lignes vers l'entrée standard avec un outil comme
 `tail -f`. Les alertes signalent une activité à examiner.
 
-La mémoire dépend de la taille des lignes et de la diversité des IP, des
-utilisateurs et des couples suivis par la règle de force brute.
+La mémoire dépend de la taille des lignes, de la diversité des IP et des
+utilisateurs, ainsi que du nombre d'échecs en attente pour les couples suivis
+par la règle de force brute. Le seuil borne le nombre d'échecs en attente par
+couple.
 
 Une seule analyse peut publier dans un dossier de résultats à la fois. En cas
 d'erreur d'écriture pendant la publication, les résultats précédents sont
