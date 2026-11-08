@@ -3,8 +3,9 @@
 import json
 import math
 from datetime import datetime
-from ipaddress import ip_address
 from typing import Any, TypedDict
+
+from .addresses import normalize_ip
 
 
 class Log(TypedDict):
@@ -22,6 +23,14 @@ class Log(TypedDict):
 
 
 LEVELS = frozenset({"INFO", "WARNING", "ERROR", "CRITICAL"})
+
+
+def unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Refuser les clés répétées avant qu'elles écrasent une valeur."""
+    record = dict(pairs)
+    if len(record) != len(pairs):
+        raise ValueError("clé JSON répétée")
+    return record
 
 
 def validate_json(value: Any) -> None:
@@ -43,7 +52,7 @@ def parse_log(text: str, source: tuple[str, int] = ("<texte>", 1)) -> Log:
     """Accepter un objet JSON ou six champs séparés par |."""
     text = text.strip()
     if text.startswith("{"):
-        record = json.loads(text)
+        record = json.loads(text, object_pairs_hook=unique_json_object)
     else:
         parts = text.split("|", 5)
         if len(parts) != 6:
@@ -54,7 +63,9 @@ def parse_log(text: str, source: tuple[str, int] = ("<texte>", 1)) -> Log:
         ))
         payload_text = parts[5].strip()
         if payload_text.startswith(("{", "[")):
-            record["payload"] = json.loads(payload_text)
+            record["payload"] = json.loads(
+                payload_text, object_pairs_hook=unique_json_object,
+            )
 
     if not isinstance(record, dict):
         raise ValueError("le log doit être un objet JSON")
@@ -71,7 +82,7 @@ def parse_log(text: str, source: tuple[str, int] = ("<texte>", 1)) -> Log:
     level = record["level"].strip().upper()
     if level not in LEVELS:
         raise ValueError(f"niveau inconnu : {level!r}")
-    address = str(ip_address(record["ip"].strip()))
+    address = normalize_ip(record["ip"].strip())
     payload = record.get("payload", "")
     connection = None
     if isinstance(payload, list):
@@ -85,7 +96,7 @@ def parse_log(text: str, source: tuple[str, int] = ("<texte>", 1)) -> Log:
         protocol = protocol.strip().upper()
         if protocol not in {"TCP", "UDP"}:
             raise ValueError("protocole attendu : TCP ou UDP")
-        connection = (str(ip_address(host)), port, protocol)
+        connection = (normalize_ip(host), port, protocol)
         payload = connection
     elif not isinstance(payload, (str, dict)):
         raise ValueError("payload attendu : texte, objet JSON ou connexion")

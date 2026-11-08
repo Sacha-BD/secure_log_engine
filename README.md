@@ -151,8 +151,11 @@ Les champs texte obligatoires sont `timestamp`, `level`, `ip`, `user` et
 IPv4 ou IPv6 et les niveaux `INFO`, `WARNING`, `ERROR` et `CRITICAL`. Le
 payload peut être du texte, un objet JSON ou une connexion sous la forme
 `[IP, port, protocole]` avec `TCP` ou `UDP`.
+Pour comparer les IP, le moteur ramène les IPv4 mappées en IPv6 à leur
+notation IPv4 et ignore les identifiants de zone IPv6.
 Les nombres JSON non finis (`NaN`, `Infinity`, débordements) et les chaînes
-Unicode invalides sont rejetés, y compris dans les champs JSON imbriqués.
+Unicode invalides sont rejetés, tout comme les clés JSON répétées, même dans
+les objets imbriqués.
 
 ### Détection de force brute
 

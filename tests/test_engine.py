@@ -99,6 +99,7 @@ class ParsingTests(unittest.TestCase):
         bad_payloads = [
             '{"nested":[NaN]}', '{"value":1e999}',
             r'{"level":"ERROR","code":0,"hidden":"\ud800"}',
+            '{"code":NaN,"code":0}',
             '{"nested":' + '[' * 2000 + '0' + ']' * 2000 + '}',
         ]
         for payload in bad_payloads:
@@ -112,6 +113,10 @@ class ParsingTests(unittest.TestCase):
                 self.assertEqual(counters["invalid"], 1)
                 with self.assertRaisesRegex(ValueError, "test:1"):
                     list(process_logs(lines, counters, strict=True))
+
+    def test_duplicate_keys_are_rejected_in_json_records(self):
+        with self.assertRaisesRegex(ValueError, "clé JSON répétée"):
+            parse_log('{"event":"LOGIN_FAILED","event":"LOGIN_SUCCESS"}')
 
     def test_pipeline_is_lazy_and_counts_rejections(self):
         counters = dict(read=0, ignored=0, invalid=0, valid=0)
@@ -297,6 +302,29 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(
                 audit["pipeline_locals"]["histories"]["type"], "dict"
             )
+
+    def test_address_aliases_share_blacklist_and_login_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            logs = root / "input.log"
+            blacklist = root / "blacklist.txt"
+            addresses = (
+                "192.0.2.1", "::ffff:c000:201", "fe80::1%eth0", "FE80::1",
+            )
+            logs.write_text("".join(
+                f"2026-09-29 10:00:00|ERROR|{ip}|u|LOGIN_FAILED|test\n"
+                for ip in addresses
+            ), encoding="utf-8")
+            blacklist.write_text(
+                "::ffff:192.0.2.1\nfe80::1%eth1\n", encoding="utf-8",
+            )
+
+            summary = run([logs], blacklist, root, threshold=2)
+
+            self.assertEqual(summary["active_ips"], ["192.0.2.1", "fe80::1"])
+            self.assertEqual(summary["alerts"], {
+                "BLACKLIST": 4, "BRUTE_FORCE": 2,
+            })
 
     def test_empty_file(self):
         with tempfile.TemporaryDirectory() as directory:

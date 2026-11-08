@@ -1,9 +1,10 @@
 """Lire les fichiers de logs ligne par ligne."""
 
 from collections.abc import Iterable, Iterator
-from ipaddress import ip_address
 from pathlib import Path
 from typing import TextIO
+
+from .addresses import normalize_ip
 
 # Le tuple contient le fichier, le numéro de ligne et son texte.
 SourceLine = tuple[str, int, str]
@@ -42,7 +43,7 @@ def load_blacklist(path: Path) -> frozenset[str]:
             continue
         try:
             value.encode("utf-8")
-            addresses.add(str(ip_address(value)))
+            addresses.add(normalize_ip(value))
         except ValueError as error:
             raise ValueError(
                 f"{source}:{number} : IP blacklist invalide : {value!r}"
