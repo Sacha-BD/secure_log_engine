@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime
+from itertools import product
 from pathlib import Path
 
 from main import BASE_DIR, run
@@ -145,6 +146,35 @@ class RuleTests(unittest.TestCase):
         events = [sample()] * 2 + [sample("LOGIN_SUCCESS")] + [sample()] * 2
         self.assertEqual(self.evaluate(events)[0], [])
         self.assertEqual(len(self.evaluate(events + [sample()])[0]), 1)
+
+    def test_success_releases_pending_history_immediately(self):
+        for threshold in (2, 5, sys.maxsize + 1):
+            with self.subTest(threshold=threshold):
+                alerts, histories = self.evaluate(
+                    [sample(), sample("LOGIN_SUCCESS")], threshold,
+                )
+                self.assertEqual(alerts, [])
+                self.assertEqual(histories, {})
+
+    def test_all_short_authentication_sequences(self):
+        for threshold in range(1, 6):
+            for sequence in product((False, True), repeat=8):
+                histories = {}
+                consecutive = 0
+                for failed in sequence:
+                    event = "LOGIN_FAILED" if failed else "LOGIN_SUCCESS"
+                    consecutive = consecutive + 1 if failed else 0
+                    expected = consecutive == threshold
+                    if expected:
+                        consecutive = 0
+                    alerts = list(apply_security_rules(
+                        detect_bruteforce, log=sample(event),
+                        threshold=threshold, histories=histories,
+                    ))
+                    self.assertEqual(bool(alerts), expected)
+                    self.assertEqual(
+                        sum(map(len, histories.values())), consecutive,
+                    )
 
     def test_identities_are_independent(self):
         events = [sample(), sample(ip="192.0.2.2"), sample(user="bob")]

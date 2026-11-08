@@ -38,8 +38,9 @@ def detect_bruteforce(log: Log, **config: Any) -> Alert | None:
     history = histories[identity]
     history.append(failed)
 
-    # Chaque tentative examinée est retirée. Un succès annule le préfixe.
-    while len(history) >= threshold:
+    # Un succès vide immédiatement la série, même en dessous du seuil.
+    # Chaque tentative examinée est retirée ; break termine sur le succès.
+    while history and (len(history) >= threshold or not failed):
         for _ in range(threshold):
             if history.popleft():
                 continue

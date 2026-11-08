@@ -155,7 +155,9 @@ Quand la file d'une identité atteint le seuil, la boucle `for` examine les
 tentatives en les retirant. Elle passe à la suivante avec `continue` après un
 échec et s'interrompt avec `break` après un succès. Le `else` déclenche l'alerte
 si toutes les tentatives examinées étaient des échecs. La boucle `while`
-traite la file tant qu'elle contient assez de tentatives.
+traite la file dès qu'elle atteint le seuil ou qu'un succès doit l'annuler.
+Un succès libère immédiatement l'historique de l'identité, même si le seuil
+n'était pas atteint.
 
 ### Moteur de règles
 
