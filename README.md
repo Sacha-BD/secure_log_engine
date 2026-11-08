@@ -107,8 +107,7 @@ secure_log_engine/
 │   ├── test_engine.py
 │   └── benchmark_memory.py
 └── report/
-    ├── rapport.ipynb
-    └── verification.md
+    └── rapport.ipynb
 ```
 
 - `main.py` relie toutes les étapes et gère les options de la commande.
@@ -119,7 +118,6 @@ secure_log_engine/
 - `rules.py` contient les règles de sécurité.
 - `audit.py` crée un rapport simple sur les variables utilisées.
 - `rapport.ipynb` présente le fonctionnement et les résultats du projet.
-- `verification.md` détaille les contrôles effectués face à l'énoncé.
 
 Nous conseillons de lire les fichiers dans cet ordre : `main.py`, puis les
 modules de `src/` dans l'ordre de la liste ci-dessus.
@@ -233,8 +231,7 @@ cellules utilisent uniquement la bibliothèque standard ; l'installation de
 Jupyter n'est pas nécessaire. Le notebook peut être consulté sur GitHub
 avec ses sorties sauvegardées.
 
-La suite passe sous Python 3.10.22, 3.12.16 et 3.14.10. Voir le
-[compte rendu de vérification](report/verification.md).
+La suite passe sous Python 3.10.22, 3.12.16 et 3.14.10.
 
 Pour reproduire les mesures mémoire du rapport :
 
