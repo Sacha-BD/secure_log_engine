@@ -10,6 +10,7 @@ from itertools import product
 from pathlib import Path
 from queue import Queue
 from threading import Thread
+from unittest.mock import patch
 
 from main import BASE_DIR, run
 from src.analyzer import Analyzer
@@ -508,6 +509,44 @@ class IntegrationTests(unittest.TestCase):
                 run([BASE_DIR / "data/auth.log"],
                     BASE_DIR / "data/blacklist.txt", out)
             self.assertEqual(summary.read_text(), "ancien résultat")
+
+    def test_publication_failure_restores_previous_results(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            source = out / "empty.log"
+            source.touch()
+            alerts = out / "alerts.jsonl"
+            alerts.write_bytes(b"anciennes alertes")
+            audit = out / "audit.json"
+            audit.write_bytes(b"ancien audit")
+            replace = Path.replace
+
+            def fail_on_new_alerts(path: Path, target: Path) -> Path:
+                if target == alerts and path.parent.name.startswith("tmp"):
+                    raise PermissionError("publication interrompue")
+                return replace(path, target)
+
+            with patch.object(Path, "replace", fail_on_new_alerts):
+                with self.assertRaisesRegex(PermissionError, "interrompue"):
+                    run([source], BASE_DIR / "data/blacklist.txt", out)
+
+            self.assertEqual(alerts.read_bytes(), b"anciennes alertes")
+            self.assertEqual(audit.read_bytes(), b"ancien audit")
+            self.assertCountEqual(out.iterdir(), [source, alerts, audit])
+
+    def test_publication_does_not_touch_another_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            source = out / "empty.log"
+            source.touch()
+            lock = out / ".securelog-publish"
+            lock.mkdir()
+            backup = lock / "summary.json"
+            backup.write_bytes(b"autre analyse en cours")
+            with self.assertRaisesRegex(FileExistsError, "verrouillée"):
+                run([source], BASE_DIR / "data/blacklist.txt", out)
+            self.assertCountEqual(out.iterdir(), [source, lock])
+            self.assertEqual(backup.read_bytes(), b"autre analyse en cours")
 
     def test_cli_errors(self):
         for arguments, expected in [

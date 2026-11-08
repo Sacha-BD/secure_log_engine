@@ -266,5 +266,9 @@ rediriger les nouvelles lignes vers l'entrée standard avec un outil comme
 La mémoire dépend de la taille des lignes et de la diversité des IP, des
 utilisateurs et des couples suivis par la règle de force brute.
 
-Les fichiers de résultats sont remplacés individuellement. Les analyses
-lancées en parallèle doivent utiliser des dossiers `--output` distincts.
+Une seule analyse peut publier dans un dossier de résultats à la fois. En cas
+d'erreur d'écriture pendant la publication, les résultats précédents sont
+restaurés. Les fichiers restent remplacés individuellement. Pour conserver
+les résultats de chaque analyse parallèle, utilisez des dossiers `--output`
+distincts. Après une interruption brutale pendant la publication, le dossier
+`.securelog-publish` peut contenir les sauvegardes à restaurer avant de relancer.

@@ -3,6 +3,7 @@
 import argparse
 import json
 import logging
+import shutil
 import sys
 import tempfile
 from collections import defaultdict
@@ -33,6 +34,46 @@ def positive_int(text: str) -> int:
             "valeur strictement positive attendue"
         )
     return value
+
+
+def publish_results(staging: Path, targets: list[Path]) -> None:
+    """Publier une seule analyse à la fois et restaurer après un échec."""
+    previous = staging.parent / ".securelog-publish"
+    try:
+        previous.mkdir()
+    except FileExistsError as error:
+        raise FileExistsError(
+            f"publication verrouillée : {previous}"
+        ) from error
+
+    changes: list[tuple[Path, Path | None]] = []
+    try:
+        for target in targets:
+            if target.is_dir():
+                raise IsADirectoryError(f"la sortie est un dossier : {target}")
+        for target in targets:
+            backup = previous / target.name
+            try:
+                target.rename(backup)
+            except FileNotFoundError:
+                changes.append((target, None))
+            else:
+                changes.append((target, backup))
+            (staging / target.name).replace(target)
+    except BaseException:
+        try:
+            for target, backup in reversed(changes):
+                if backup is None:
+                    target.unlink(missing_ok=True)
+                else:
+                    backup.replace(target)
+        except OSError as error:
+            raise OSError(
+                f"restauration interrompue ; sauvegardes dans {previous}"
+            ) from error
+        previous.rmdir()
+        raise
+    shutil.rmtree(previous)
 
 
 def run(
@@ -106,8 +147,7 @@ def run(
             encoding="utf-8",
         )
         export_audit(staging / "audit.json", globals(), locals())
-        for target in targets:
-            (staging / target.name).replace(target)
+        publish_results(staging, targets)
     return summary
 
 
