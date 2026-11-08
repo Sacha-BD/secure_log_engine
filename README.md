@@ -104,9 +104,11 @@ secure_log_engine/
 │   ├── rules.py
 │   └── audit.py
 ├── tests/
-│   └── test_engine.py
+│   ├── test_engine.py
+│   └── benchmark_memory.py
 └── report/
-    └── rapport.ipynb
+    ├── rapport.ipynb
+    └── verification.md
 ```
 
 - `main.py` relie toutes les étapes et gère les options de la commande.
@@ -117,6 +119,7 @@ secure_log_engine/
 - `rules.py` contient les règles de sécurité.
 - `audit.py` crée un rapport simple sur les variables utilisées.
 - `rapport.ipynb` présente le fonctionnement et les résultats du projet.
+- `verification.md` détaille les contrôles effectués face à l'énoncé.
 
 Nous conseillons de lire les fichiers dans cet ordre : `main.py`, puis les
 modules de `src/` dans l'ordre de la liste ci-dessus.
@@ -221,9 +224,29 @@ Le dossier `results/` contient ensuite :
 python -m unittest discover -s tests -v
 ```
 
-Les 29 tests couvrent notamment le parsing, les lignes invalides, la
+Les 37 tests couvrent notamment le parsing, les lignes invalides, la
 blacklist, les opérations sur les ensembles, la détection de force brute et
-le passage d'un flux par la CLI.
+le passage d'un flux par la CLI. Ils vérifient aussi qu'une alerte est émise
+avant la fermeture de l'entrée standard et que les sorties du notebook
+correspondent à une nouvelle exécution de ses cellules. Les tests et les
+cellules utilisent uniquement la bibliothèque standard ; l'installation de
+Jupyter n'est pas nécessaire. Le notebook peut être consulté sur GitHub
+avec ses sorties sauvegardées.
+
+La suite passe sous Python 3.10.22, 3.12.16 et 3.14.10. Voir le
+[compte rendu de vérification](report/verification.md).
+
+Pour reproduire les mesures mémoire du rapport :
+
+```bash
+python -m tests.benchmark_memory --lines 10000 100000 1000000
+python -m tests.benchmark_memory --lines 10000 --distinct
+```
+
+Le benchmark génère les fichiers ligne par ligne, puis mesure le pipeline
+avec `tracemalloc`. Il contrôle aussi les nombres d'événements et d'alertes.
+La mesure porte sur les allocations Python, pas sur toute la mémoire du
+processus. Les données temporaires sont automatiquement supprimées.
 
 ## Limites
 
